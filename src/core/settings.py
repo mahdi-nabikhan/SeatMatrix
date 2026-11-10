@@ -131,3 +131,12 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
+
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Cinema SaaS API',
+    'DESCRIPTION': 'API documentation for the Cinema Booking Marketplace',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
