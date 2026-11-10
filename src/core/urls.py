@@ -5,10 +5,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # JWT Auth
-    path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Swagger / OpenAPI URLs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

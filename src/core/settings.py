@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     
     # Third-party Apps (پکیج‌های خارجی)
     'rest_framework',
+    'drf_spectacular',
     
     # Local Apps (اپلیکیشن‌های پروژه ما)
     'accounts',
@@ -121,8 +122,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    # این خط را باید اضافه کنید تا ارور برطرف شود:
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
