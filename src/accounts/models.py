@@ -1,5 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.utils import timezone
+from datetime import timedelta
+
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, username, email, password=None, **extra_fields):
@@ -48,3 +52,24 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.username} ({self.email})"
+    
+    
+    
+    
+class OTP(models.Model):
+    user = models.ForeignKey(
+        'accounts.User', 
+        on_delete=models.CASCADE, 
+        related_name='otps'
+    )
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_valid(self):
+        
+        expiration_time = self.created_at + timedelta(minutes=2)
+        return not self.is_used and timezone.now() <= expiration_time
+
+    def __str__(self):
+        return f"{self.user.username} - {self.code}"
