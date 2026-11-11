@@ -4,10 +4,7 @@ from cinemas.models import Cinema
 
 class Manager(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='manager_profile')
-    
- 
-    cinema = models.OneToOneField(Cinema, on_delete=models.CASCADE, related_name='manager')
-    
+      
     bank_iban = models.CharField(max_length=24, null=True, blank=True)
 
     def __str__(self):
