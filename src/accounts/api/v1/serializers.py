@@ -2,11 +2,12 @@
 from rest_framework import serializers, validators
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.password_validation import validate_password
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer,TokenRefreshSerializer
 from rest_framework.exceptions import ValidationError
 from accounts.models import User
-
+from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import InvalidToken
 from django.contrib.auth import get_user_model
 from ...models import OTP
 import random
@@ -169,5 +170,26 @@ class ChangePasswordSerializer(serializers.Serializer):
             }) 
         return data
 
+class CookieTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    خواندن خودکار refresh_token از کوکی HttpOnly به جای بدنه درخواست JSON
+    """
+    # فیلد refresh را اختیاری می‌کنیم تا اگر در بادی فرستاده نشد، DRF خطای Required ندهد
+    refresh = serializers.CharField(required=False)
 
+    def extract_refresh_token(self):
+        request = self.context.get('request')
+        if request is not None:
+            cookie_name = settings.SIMPLE_JWT.get('AUTH_COOKIE_REFRESH', 'refresh_token')
+            cookie_token = request.COOKIES.get(cookie_name)
+            if cookie_token:
+                return cookie_token
+        raise InvalidToken("توکن رفرش در کوکی یافت نشد.")
+
+    def validate(self, attrs):
+        # اگر در بدنه JSON فرستاده نشده بود، از کوکی استخراج کن
+        if not attrs.get('refresh'):
+            attrs['refresh'] = self.extract_refresh_token()
+            
+        return super().validate(attrs)
         
