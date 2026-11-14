@@ -5,6 +5,7 @@ from datetime import timedelta
 
 
 
+
 class CustomUserManager(BaseUserManager):
     def create_user(self, username, email, password=None, **extra_fields):
         if not username:
@@ -45,8 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
-    USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['email']
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username','phone_number']
 
     objects = CustomUserManager()
 
@@ -75,4 +76,4 @@ class OTP(models.Model):
         return not self.is_used and timezone.now() <= expiration_time
 
     def __str__(self):
-        return f"{self.user.username} - {self.code}"
+        return f"{self.user.username} : {self.code}"
