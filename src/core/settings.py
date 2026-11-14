@@ -5,22 +5,22 @@ Django settings for core project.
 from pathlib import Path
 from datetime import timedelta
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-k877m6gp(e#(pvxy%lx+j%a(b5)+l2zx$^=dtj49_=k)a=97&_'
-
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# برای محیط توسعه داکر، اجازه دسترسی به همه هاست‌ها را می‌دهیم
+ALLOWED_HOSTS = ['*']
 
 
 # ==========================================
-# 1. INSTALLED APPS (برنامه‌های نصب شده)
+# 1. TENANT & APPS CONFIGURATION
 # ==========================================
-INSTALLED_APPS = [
+# اپلیکیشن‌هایی که دیتای عمومی دارند (فقط در Public Schema ذخیره می‌شوند)
+SHARED_APPS = (
+    'django_tenants',  # 🔴 باید حتماً اولین گزینه باشد!
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -28,26 +28,47 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
-    # Third-party Apps (پکیج‌های خارجی)
+    # Third-party Apps
     'rest_framework',
+    'rest_framework_simplejwt',
     'drf_spectacular',
     
-    # Local Apps (اپلیکیشن‌های پروژه ما)
+    # Local Apps (Shared data)
     'accounts',
-    'cinemas',
+    'cinemas',  # چون مدل CinemaBranch اینجاست، باید در Shared باشد
     'profiles',
+)
+
+# اپلیکیشن‌هایی که دیتای ایزوله دارند (برای هر سینما یک دیتابیس جدا ساخته می‌شود)
+TENANT_APPS = (
     'orders',
     'payments',
-]
+    'promotions',
+    'notifications',
+)
+
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+# معرفی مدل مستأجر و دامنه به پکیج
+TENANT_MODEL = "cinemas.CinemaBranch"
+TENANT_DOMAIN_MODEL = "cinemas.BranchDomain"
 
 
 # ==========================================
-# 2. CUSTOM USER MODEL (معرفی مدل یوزر خودمان)
+# 2. CUSTOM USER MODEL
 # ==========================================
 AUTH_USER_MODEL = 'accounts.User'
 
 
+# ==========================================
+# 3. DATABASE ROUTER & MIDDLEWARE
+# ==========================================
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
+
 MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware', # 🔴 باید حتماً اولین میدلور باشد!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -78,12 +99,16 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 
 # ==========================================
-# 3. DATABASE (فعلاً روی همین SQLite نگه می‌داریم)
+# 4. DATABASE (PostgreSQL for Multi-Tenancy)
 # ==========================================
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django_tenants.postgresql_backend', # انجین مخصوص معماری چندمستأجری
+        'NAME': 'seatmatrix_db',
+        'USER': 'postgres',
+        'PASSWORD': '123',
+        'HOST': 'db',  # اشاره به سرویس دیتابیس در فایل docker-compose
+        'PORT': '5432',
     }
 }
 
@@ -97,7 +122,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # ==========================================
-# 4. INTERNATIONALIZATION (تنظیم زمان ایران)
+# 5. INTERNATIONALIZATION
 # ==========================================
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Tehran'
@@ -106,14 +131,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
 
 # ==========================================
-# 5. REST FRAMEWORK & JWT SETTINGS
+# 6. REST FRAMEWORK & JWT SETTINGS
 # ==========================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -122,9 +142,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    # این خط را باید اضافه کنید تا ارور برطرف شود:
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -133,8 +153,6 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
-
-
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Cinema SaaS API',
