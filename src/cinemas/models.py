@@ -1,13 +1,15 @@
 from django.db import models
+from django_tenants.models import TenantMixin, DomainMixin
+
+# ==========================================
+# بخش اول: داده‌های عمومی (Public Schema)
+# ==========================================
 
 class Address(models.Model):
-    """Independent address table for branches (and potentially users in the future)"""
     province = models.CharField(max_length=50, verbose_name="Province/State")
     city = models.CharField(max_length=50, verbose_name="City")
     full_address = models.TextField(verbose_name="Full Address")
     postal_code = models.CharField(max_length=10, null=True, blank=True)
-    
-    # Coordinates for maps integration
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
@@ -16,7 +18,6 @@ class Address(models.Model):
 
 
 class Cinema(models.Model):
-    """The main brand or franchise (e.g., Kourosh Cineplex)"""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -25,51 +26,31 @@ class Cinema(models.Model):
         return self.name
 
 
-class CinemaBranch(models.Model):
-    """Physical branches belonging to a Cinema brand"""
+class CinemaBranch(TenantMixin):
+    """مدل مستأجر (Tenant) که برای هر رکورد یک Schema جداگانه در Postgres می‌سازد"""
     cinema = models.ForeignKey(Cinema, on_delete=models.CASCADE, related_name='branches')
     address = models.OneToOneField(Address, on_delete=models.PROTECT, related_name='cinema_branch')
-    
-    # Manager is the owner: A branch must have a manager to exist, and we protect it from accidental deletion
     manager = models.OneToOneField('profiles.Manager', on_delete=models.PROTECT, related_name='branch')
     
-    branch_name = models.CharField(max_length=100) # e.g., "Main Branch", "West Branch"
+    branch_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
-    
-    # Store facilities like Parking, Cafe, WiFi as JSON
     facilities = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
+    
+    # ساخت اتوماتیک دیتابیس شعبه
+    auto_create_schema = True
 
     def __str__(self):
         return f"{self.cinema.name} - {self.branch_name}"
 
 
-class Hall(models.Model):
-    """Halls/Rooms inside a specific branch"""
-    branch = models.ForeignKey(CinemaBranch, on_delete=models.CASCADE, related_name='halls')
-    name = models.CharField(max_length=50) # e.g., "VIP Hall", "Hall 1"
-    
-    def __str__(self):
-        return f"{self.branch.branch_name} - {self.name}"
-
-
-class Seat(models.Model):
-    """Physical seats inside a hall"""
-    hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='seats')
-    row_label = models.CharField(max_length=5) # e.g., "A", "B"
-    seat_number = models.PositiveIntegerField() # e.g., 1, 2, 3
-    is_vip = models.BooleanField(default=False)
-
-    class Meta:
-        # Prevents having two 'A1' seats in the same hall
-        unique_together = ('hall', 'row_label', 'seat_number')
-
-    def __str__(self):
-        return f"{self.hall.name} : {self.row_label}{self.seat_number}"
+class BranchDomain(DomainMixin):
+    """آدرس دامنه اختصاصی مستأجر (مثلاً azadi.seatmatrix.ir)"""
+    pass
 
 
 class Movie(models.Model):
-    """Movie details"""
+    """فیلم‌ها عمومی هستند و بین همه سینماها مشترکند"""
     title = models.CharField(max_length=200)
     description = models.TextField()
     duration_minutes = models.PositiveIntegerField()
@@ -80,20 +61,43 @@ class Movie(models.Model):
         return self.title
 
 
+# ==========================================
+# بخش دوم: داده‌های ایزوله (Tenant Schema)
+# ==========================================
+
+class Hall(models.Model):
+    """سالن سینما - مختص دیتابیس یک شعبه خاص"""
+    name = models.CharField(max_length=50)
+    
+    def __str__(self):
+        return self.name
+
+
+class Seat(models.Model):
+    hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='seats')
+    row_label = models.CharField(max_length=5)
+    seat_number = models.PositiveIntegerField()
+    is_vip = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('hall', 'row_label', 'seat_number')
+
+    def __str__(self):
+        return f"{self.hall.name} : {self.row_label}{self.seat_number}"
+
+
 class Showtime(models.Model):
-    """A specific screening of a movie in a hall at a given time"""
-    branch = models.ForeignKey(CinemaBranch, on_delete=models.CASCADE, related_name='showtimes')
+    """سانس پخش فیلم"""
     hall = models.ForeignKey(Hall, on_delete=models.CASCADE)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
+    movie = models.ForeignKey(Movie, on_delete=models.CASCADE) # اشاره به جدول پابلیک
     start_time = models.DateTimeField()
     base_price = models.DecimalField(max_digits=10, decimal_places=0)
 
     def __str__(self):
-        return f"{self.movie.title} | {self.branch.branch_name} | {self.start_time.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.movie.title} | {self.hall.name} | {self.start_time.strftime('%Y-%m-%d %H:%M')}"
 
 
 class ShowtimeSeat(models.Model):
-    """State of a specific seat for a specific showtime (Crucial for booking logic and preventing double-booking)"""
     STATUS_CHOICES = (
         ('AVAILABLE', 'Available'),
         ('RESERVED', 'Reserved (In Cart)'),
@@ -104,7 +108,6 @@ class ShowtimeSeat(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='AVAILABLE')
     
     class Meta:
-        # A seat can only have one status per showtime
         unique_together = ('showtime', 'seat')
 
     def __str__(self):
