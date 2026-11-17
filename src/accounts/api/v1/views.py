@@ -146,3 +146,28 @@ class CheckUserLoginApiview(generics.GenericAPIView):
     
     def get(self,request):
         return Response({'detail':request.user.username})
+    
+    
+    
+    
+
+
+class LogoutApiView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self,request,*args,**kwargs):
+        
+        response = Response({'detail': 'با موفقیت خارج شدید.'}, status=status.HTTP_200_OK)
+        simple_jwt_settings = getattr(settings,'SIMPLE_JWT', {})
+        response.delete_cookie(
+            key=simple_jwt_settings.get('AUTH_COOKIE', 'access_token'),
+            path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+        )
+        
+        response.delete_cookie(
+            key=simple_jwt_settings.get('AUTH_COOKIE_REFRESH', 'refresh_token'),
+            path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+        )
+        return response
