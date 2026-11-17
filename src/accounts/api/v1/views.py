@@ -2,14 +2,14 @@ from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from .serializers import UserRegistrationSerializer,EmailJWTLoginSerializers
+from .serializers import UserRegistrations,EmailJWTLoginSerializers
 from profiles.models import Customer,Manager,Staff
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 User = get_user_model()
 
 class UserRegistrationApiView(generics.GenericAPIView):
-    serializer_class = UserRegistrationSerializer
+    serializer_class = UserRegistrations
     permission_classes = [permissions.AllowAny]
     queryset = User.objects.all()
 
@@ -54,23 +54,25 @@ class EmailJwtLoginApiView (TokenObtainPairView):
             
             
         response = Response({'user_id': user.id,'redirect_url': redirect_url,}, status=status.HTTP_200_OK)
+        simple_jwt_settings = getattr(settings, 'SIMPLE_JWT', {})
         response.set_cookie(
-            key=settings.SIMPLE_JWT['AUTH_COOKIE'],
+            key=simple_jwt_settings.get('AUTH_COOKIE', 'access_token'),
             value=access_token,
-            max_age=int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds()),
-            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-            path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+            max_age=int(simple_jwt_settings.get('ACCESS_TOKEN_LIFETIME').total_seconds()),
+            secure=simple_jwt_settings.get('AUTH_COOKIE_SECURE', False),
+            httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
+            samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+            path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
         )
+        
         response.set_cookie(
-            key=settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'],
+            key=simple_jwt_settings.get('AUTH_COOKIE_REFRESH', 'refresh_token'),
             value=refresh_token,
-            max_age=int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
-            secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-            httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-            samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE'],
-            path=settings.SIMPLE_JWT['AUTH_COOKIE_PATH'],
+            max_age=int(simple_jwt_settings.get('REFRESH_TOKEN_LIFETIME').total_seconds()),
+            secure=simple_jwt_settings.get('AUTH_COOKIE_SECURE', False),
+            httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
+            samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+            path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
         )
 
         return response

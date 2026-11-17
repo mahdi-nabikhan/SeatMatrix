@@ -30,7 +30,7 @@ class UserRegistrations(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
     class Meta :
         model = User
-        fields = '__all__'
+        fields = ['username','email','password','confirm_password','phone_number']
         extra_kwargs = {'password': {'write_only': True}}
         
         
@@ -43,9 +43,9 @@ class UserRegistrations(serializers.ModelSerializer):
             msg = _('password most be match')
             raise serializers.ValidationError(msg, code='invalid password')
         
-        if len(phone_number) <= 12:
-             msg = _('password most be 12 charecter')
-             raise serializers.ValidationError(msg, code='invalid password')
+        if len(phone_number) < 12:
+             msg = _('Phone number must be at least 12 characters.')
+             raise serializers.ValidationError(msg, code='invalid_phone_number')
         
         try:
             validate_password(password=password1)
@@ -56,7 +56,7 @@ class UserRegistrations(serializers.ModelSerializer):
         
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        return User.objects.create_user(**self.validated_data)
+        return User.objects.create_user(**validated_data)
     
     
     
@@ -70,7 +70,7 @@ class EmailJWTLoginSerializers(TokenObtainPairSerializer):
         validated_data = super().validate(attrs)
         validated_data['email'] = self.user.email
         validated_data['user-id'] = self.user.pk
-        return self.validate
+        return validated_data
     
     
     

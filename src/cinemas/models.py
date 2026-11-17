@@ -1,5 +1,6 @@
 from django.db import models
 from django_tenants.models import TenantMixin, DomainMixin
+from django.core.exceptions import ValidationError
 
 # ==========================================
 # بخش اول: داده‌های عمومی (Public Schema)
@@ -21,26 +22,35 @@ class Cinema(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    manager = models.OneToOneField('profiles.Manager', on_delete=models.PROTECT, related_name='owned_cinema', null=True, blank=True)
+    
     def __str__(self):
         return self.name
 
 
 class CinemaBranch(TenantMixin):
-    """مدل مستأجر (Tenant) که برای هر رکورد یک Schema جداگانه در Postgres می‌سازد"""
-    cinema = models.ForeignKey(Cinema, on_delete=models.CASCADE, related_name='branches')
-    address = models.OneToOneField(Address, on_delete=models.PROTECT, related_name='cinema_branch')
-    manager = models.OneToOneField('profiles.Manager', on_delete=models.PROTECT, related_name='branch')
+    cinema = models.ForeignKey(Cinema, on_delete=models.CASCADE, related_name='branches', null=True, blank=True)
+    address = models.OneToOneField(Address, on_delete=models.PROTECT, related_name='cinema_branch', null=True, blank=True)
     
     branch_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=15, null=True, blank=True)
     facilities = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
-    
-    # ساخت اتوماتیک دیتابیس شعبه
     auto_create_schema = True
 
+    def clean(self):
+        super().clean()
+        
+        # برای مستأجرهای واقعی (غیر از public)، سینما و آدرس اجباری است
+        if self.schema_name != 'public':
+            if not self.cinema:
+                raise ValidationError({'cinema': 'تعیین سینما برای شعبه الزامی است.'})
+            if not self.address:
+                raise ValidationError({'address': 'ثبت آدرس برای شعبه الزامی است.'})
+
     def __str__(self):
+        if self.schema_name == 'public':
+            return "Public Core System"
         return f"{self.cinema.name} - {self.branch_name}"
 
 
