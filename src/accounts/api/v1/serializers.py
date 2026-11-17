@@ -131,7 +131,7 @@ class VerifyOTPLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("کد تایید نامعتبر یا منقضی شده است.")
         otp_obj.is_used = True
         otp_obj.save()
-
+        self.user = user
         return get_tokens_for_user(user)
     
     
@@ -172,10 +172,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         return data
 
 class CookieTokenRefreshSerializer(TokenRefreshSerializer):
-    """
-    خواندن خودکار refresh_token از کوکی HttpOnly به جای بدنه درخواست JSON
-    """
-    # فیلد refresh را اختیاری می‌کنیم تا اگر در بادی فرستاده نشد، DRF خطای Required ندهد
+
     refresh = serializers.CharField(required=False)
 
     def extract_refresh_token(self):
@@ -188,7 +185,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
         raise InvalidToken("توکن رفرش در کوکی یافت نشد.")
 
     def validate(self, attrs):
-        # اگر در بدنه JSON فرستاده نشده بود، از کوکی استخراج کن
+
         if not attrs.get('refresh'):
             attrs['refresh'] = self.extract_refresh_token()
             
