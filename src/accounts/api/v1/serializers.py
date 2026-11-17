@@ -87,6 +87,7 @@ class UsernameJwtLoginSerializers(serializers.Serializer):
         
         if not user or not user.check_password(password):
             raise serializers.ValidationError("نام کاربری یا رمز عبور اشتباه است.")
+        self.user= user
         return get_tokens_for_user(user)
        
        
