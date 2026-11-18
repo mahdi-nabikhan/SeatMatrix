@@ -9,7 +9,7 @@ class CustomerRegisterSerializers(serializers.ModelSerializer):
     
     class Meta :
         model = Customer
-        fields = ['first_name,last_name','age','user']
+        fields = ['firstname','last_name','age','user']
    
         
         
@@ -37,8 +37,6 @@ class CustomerDetailSerializer(serializers.ModelSerializer):
     
 class CustomerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model =Customer
-        fields = ['first_name,last_name','age']
-        
-        
-        
+        model = Customer
+
+        fields = ['firstname', 'last_name', 'age']

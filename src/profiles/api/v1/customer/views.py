@@ -62,12 +62,16 @@ class CustomerUpdateApiView(generics.GenericAPIView):
         update_serializer.save()
         return Response({'message':'update successfully'})
     
+
+
+class CustomerDeleteApiView(generics.GenericAPIView):
     
+        def get_object(self):
+            return get_object_or_404(Customer, user=self.request.user)
     
-    
-    def delete(self,request):
-        obj = self.get_object()
-        obj.delete()
-        return Response({'message':'Delete successfully'})
+        def delete(self,request):
+            obj = self.get_object()
+            obj.delete()
+            return Response({'message':'Delete successfully'})
     
 
