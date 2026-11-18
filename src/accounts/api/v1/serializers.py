@@ -30,7 +30,7 @@ class UserRegistrations(serializers.ModelSerializer):
     confirm_password = serializers.CharField(write_only=True)
     class Meta :
         model = User
-        fields = '__all__'
+        fields = ['username','email','password','confirm_password','phone_number']
         extra_kwargs = {'password': {'write_only': True}}
         
         
@@ -43,9 +43,9 @@ class UserRegistrations(serializers.ModelSerializer):
             msg = _('password most be match')
             raise serializers.ValidationError(msg, code='invalid password')
         
-        if len(phone_number) <= 12:
-             msg = _('password most be 12 charecter')
-             raise serializers.ValidationError(msg, code='invalid password')
+        if len(phone_number) < 12:
+             msg = _('Phone number must be at least 12 characters.')
+             raise serializers.ValidationError(msg, code='invalid_phone_number')
         
         try:
             validate_password(password=password1)
@@ -56,7 +56,7 @@ class UserRegistrations(serializers.ModelSerializer):
         
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        return User.objects.create_user(**self.validated_data)
+        return User.objects.create_user(**validated_data)
     
     
     
@@ -70,7 +70,7 @@ class EmailJWTLoginSerializers(TokenObtainPairSerializer):
         validated_data = super().validate(attrs)
         validated_data['email'] = self.user.email
         validated_data['user-id'] = self.user.pk
-        return self.validate
+        return validated_data
     
     
     
@@ -87,6 +87,7 @@ class UsernameJwtLoginSerializers(serializers.Serializer):
         
         if not user or not user.check_password(password):
             raise serializers.ValidationError("نام کاربری یا رمز عبور اشتباه است.")
+        self.user= user
         return get_tokens_for_user(user)
        
        
@@ -130,7 +131,7 @@ class VerifyOTPLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("کد تایید نامعتبر یا منقضی شده است.")
         otp_obj.is_used = True
         otp_obj.save()
-
+        self.user = user
         return get_tokens_for_user(user)
     
     
@@ -171,10 +172,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         return data
 
 class CookieTokenRefreshSerializer(TokenRefreshSerializer):
-    """
-    خواندن خودکار refresh_token از کوکی HttpOnly به جای بدنه درخواست JSON
-    """
-    # فیلد refresh را اختیاری می‌کنیم تا اگر در بادی فرستاده نشد، DRF خطای Required ندهد
+
     refresh = serializers.CharField(required=False)
 
     def extract_refresh_token(self):
@@ -187,9 +185,18 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
         raise InvalidToken("توکن رفرش در کوکی یافت نشد.")
 
     def validate(self, attrs):
-        # اگر در بدنه JSON فرستاده نشده بود، از کوکی استخراج کن
+
         if not attrs.get('refresh'):
             attrs['refresh'] = self.extract_refresh_token()
             
         return super().validate(attrs)
+        
+        
+        
+        
+        
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta :
+        model = User
+        fields =['email','phone_number','username']
         
