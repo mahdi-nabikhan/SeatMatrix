@@ -191,3 +191,12 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             
         return super().validate(attrs)
         
+        
+        
+        
+        
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta :
+        model = User
+        fields =['email','phone_number','username']
+        
