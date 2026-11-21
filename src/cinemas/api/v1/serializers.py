@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from profiles.models import Manager
-from cinemas.models import Cinema,CinemaBranch,Address,CinemaBranchImage
+from cinemas.models import Cinema
 from profiles.api.v1.manager import serializers as manager_serializer
 from django.db import transaction
 from rest_framework.exceptions import NotFound
@@ -53,10 +53,10 @@ class CinemaUpdateSerializer(serializers.ModelSerializer):
             
             
             
-class CinemaAddressSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Address
-        fields ='__all__'
+# class CinemaAddressSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Address
+#         fields ='__all__'
         
         
             

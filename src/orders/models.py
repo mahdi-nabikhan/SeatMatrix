@@ -35,11 +35,11 @@ class Ticket(models.Model):
     """
     هر رکورد از این جدول معادل یک صندلی خریداری شده در یک سفارش است.
     """
-    # این ForeignKey اجازه می‌دهد یک سفارش، چندین بلیت داشته باشد
+
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tickets')
     
-    # OneToOneField جلوی فروش همزمان یک صندلی به دو نفر را در سطح دیتابیس می‌گیرد
-    showtime_seat = models.OneToOneField('cinemas.ShowtimeSeat', on_delete=models.PROTECT, related_name='ticket')
+  
+    showtime_seat = models.OneToOneField('operations.ShowtimeSeat', on_delete=models.PROTECT, related_name='ticket')
     
     price = models.DecimalField(max_digits=10, decimal_places=0)
     ticket_code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
