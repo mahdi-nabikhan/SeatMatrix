@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from cinemas.models import Cinema
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
-
+from cinemas.api.v1.serializers import *
 
 
 
@@ -69,3 +69,6 @@ class CinemaDeleteApiView(generics.GenericAPIView):
             {"message": "سینما با موفقیت حذف شد."}, 
             status=status.HTTP_204_NO_CONTENT
         )
+        
+        
+        

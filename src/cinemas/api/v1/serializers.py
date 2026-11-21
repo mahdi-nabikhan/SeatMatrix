@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from profiles.models import Manager
-from cinemas.models import Cinema
+from cinemas.models import Cinema,Movie,MovieImage
 from profiles.api.v1.manager import serializers as manager_serializer
 from django.db import transaction
 from rest_framework.exceptions import NotFound
@@ -53,83 +53,89 @@ class CinemaUpdateSerializer(serializers.ModelSerializer):
             
             
             
-# class CinemaAddressSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Address
-#         fields ='__all__'
+
+
+
+class MovieRegisterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields ="__all__"
+        read_only_fields = 'created_at'
+        
+
+
+class ListAndUpdateMovieSerializers(serializers.ModelSerializer):
+    class Meta:
+        model=Movie
+        fields = ['poster','duration_minutes','description','title']
         
         
-            
 
-# class CinemasBranchRegisterSerializer(serializers.ModelSerializer):
-#     address = CinemaAddressSerializer()
+class MovieImageListSerializer(serializers.ModelSerializer):
+    movie_title = serializers.CharField(source='movie.title', read_only=True)
 
-#     class Meta:
-#         model = CinemaBranch
-#         fields = '__all__'
-#         read_only_fields = ['cinema']  
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'movie', 'movie_title', 'image', 'caption', 'uploaded_at']
 
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         user = self.context['request'].user
 
-#         try:
-#             cinema = Cinema.objects.select_related('manager').get(manager__user=user)
-#         except Cinema.DoesNotExist:
-#             raise NotFound('سینمایی برای این مدیر یافت نشد.')
 
-#         address_data = validated_data.pop('address')
-#         address = Address.objects.create(**address_data)
+class RegisterMovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = '__all__'
+        read_only_fields = ['created_by_cinema', 'created_at', 'is_active']
 
-#         return CinemaBranch.objects.create(
-#             cinema=cinema,
-#             address=address,
-#             **validated_data
-#         )
-        
-        
-        
-# class CinemaBranchDetailSerializers(serializers.ModelSerializer):
-#     class Meta: 
-#         model = CinemaBranch
-#         fields ='__all__'
-        
-#     def to_representation(self, instance):
-#         res = super().to_representation(instance)
-#         res['address'] = CinemaAddressSerializer(instance.address).data
-#         res['cinema'] = CinemaDetailSerializer(instance.cinema).data
-#         return res
+    def create(self, validated_data):
+        request = self.context['request']
+        validated_data['created_by_cinema'] = request.tenant
+        return super().create(validated_data)
     
-        
-        
-# class CinemaBranchUpdateSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CinemaBranch
-#         fields = ['phone_number','branch_name','facilities','cover_image']
-        
-        
-        
-        
+class MovieListSerializer(serializers.ModelSerializer):
+    created_by_cinema_name = serializers.CharField(
+        source='created_by_cinema.name',
+        read_only=True
+    )
+    class Meta:
+        class Meta:
+            model = Movie
+            fields = [
+            'id', 'title', 'duration_minutes', 'poster',
+            'is_active', 'created_by_cinema', 'created_by_cinema_name', 'created_at']
+    
+class MovieDetailSerializer(serializers.ModelSerializer):
+    created_by_cinema_name = serializers.CharField(
+        source='created_by_cinema.name',
+        read_only=True
+    )
+    gallery_images = MovieImageListSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Movie
+        fields = '__all__'
 
 
-# class CinemaBranchImageCreateSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CinemaBranchImage
-#         fields = ['id', 'branch', 'image', 'caption', 'uploaded_at']
-#         read_only_fields = ['id', 'uploaded_at']
-
-#     def validate_branch(self, value):
-#         user = self.context['request'].user
-#         if value.cinema.manager.user != user:
-#             raise serializers.ValidationError('شما اجازه افزودن تصویر به این شعبه را ندارید.')
-#         return value
+class UpdateMovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = '__all__'
+        read_only_fields = ['id', 'created_by_cinema', 'created_at']
 
 
-# class CinemaBranchImageUpdateSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = CinemaBranchImage
-#         fields = ['id', 'image', 'caption', 'uploaded_at']
-#         read_only_fields = ['id', 'uploaded_at']
+class MovieImageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'movie', 'image', 'caption']
+        read_only_fields = ['id']
 
+
+class MovieImageUpdateSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False)
+
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'image', 'caption']
+        read_only_fields = ['id']
+        
         
         

@@ -42,6 +42,9 @@ class Movie(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by_cinema = models.ForeignKey(
+        'Cinema',
+        on_delete=models.SET_NULL,null=True,blank=True,related_name='created_movies')
 
     def __str__(self):
         return self.title
@@ -59,3 +62,7 @@ class MovieImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.movie.title}"
+    
+    
+    
+    
