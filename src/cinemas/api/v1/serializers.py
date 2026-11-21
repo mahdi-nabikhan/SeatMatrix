@@ -52,23 +52,7 @@ class CinemaUpdateSerializer(serializers.ModelSerializer):
             
             
             
-            
-
-
-
-class MovieRegisterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Movie
-        fields ="__all__"
-        read_only_fields = 'created_at'
-        
-
-
-class ListAndUpdateMovieSerializers(serializers.ModelSerializer):
-    class Meta:
-        model=Movie
-        fields = ['poster','duration_minutes','description','title']
-        
+    
         
 
 class MovieImageListSerializer(serializers.ModelSerializer):
