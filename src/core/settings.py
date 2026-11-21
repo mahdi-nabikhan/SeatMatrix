@@ -45,14 +45,14 @@ TENANT_APPS = (
     'payments',
     'promotions',
     'notifications',
+    'operations'
 )
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 # معرفی مدل مستأجر و دامنه به پکیج
-TENANT_MODEL = "cinemas.CinemaBranch"
-TENANT_DOMAIN_MODEL = "cinemas.BranchDomain"
-
+TENANT_MODEL = "cinemas.Cinema"
+TENANT_DOMAIN_MODEL = "cinemas.CinemaDomain"
 
 # ==========================================
 # 2. CUSTOM USER MODEL
