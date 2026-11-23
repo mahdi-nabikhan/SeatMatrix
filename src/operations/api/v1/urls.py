@@ -25,6 +25,7 @@ from .views import (
     ShowtimeCreateApiView,
     ShowtimeManageApiView,
     ShowtimeSeatStatusUpdateApiView,
+    ActiveMovieShowTimeListApiView
 )
 
 urlpatterns = [
@@ -56,4 +57,5 @@ urlpatterns = [
     path('showtimes/<int:pk>/', ShowtimeDetailApiView.as_view(), name='showtime-detail'),
     path('showtimes/<int:pk>/manage/', ShowtimeManageApiView.as_view(), name='showtime-manage'),
     path('showtime-seats/<int:pk>/status/', ShowtimeSeatStatusUpdateApiView.as_view(), name='showtime-seat-status'),
+    path('movies/active-showtimes/', ActiveMovieShowTimeListApiView.as_view(), name='active-movie-showtimes'),
 ]

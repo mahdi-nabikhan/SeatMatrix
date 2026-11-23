@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-
+from django.db.models import Prefetch
+from django.utils import timezone
 from operations.models import (
     CinemaBranch,
     CinemaBranchImage,
@@ -10,6 +11,10 @@ from operations.models import (
     Showtime,
     ShowtimeSeat,
 )
+from cinemas.models import Movie
+
+
+
 from .permissions import IsCinemaManager, IsManagerOrBranchAdmin
 from .serializers import (
     CinemasBranchRegisterSerializer,
@@ -32,6 +37,7 @@ from .serializers import (
     ShowtimeCreateSerializer,
     ShowtimeUpdateSerializer,
     ShowtimeSeatStatusUpdateSerializer,
+    ActiveMovieWithShowtimesSerializer
 )
 
 # ==================== CinemaBranch ====================
@@ -285,3 +291,24 @@ class ShowtimeSeatStatusUpdateApiView(generics.UpdateAPIView):
     
     
     
+
+
+class ActiveMovieShowTimeListApiView(generics.ListAPIView):
+    serializer_class = ActiveMovieWithShowtimesSerializer
+    permission_classes =  [permissions.AllowAny]
+    
+    
+    
+    def get_queryset(self):
+        now = timezone.now()
+        upcoming_showtimes = (
+            Showtime.objects.filter(start_time_gte=now,hall_is_active=True,hall__branch_is_active=True).select_related('hall__branch').order_by('start_time'))
+        return (Movie.objects.filter(is_active=True,
+                showtimes__start_time__gte=now,
+                showtimes__hall__is_active=True,
+                showtimes__hall__branch__is_active=True,).prefetch_related(
+                    Prefetch('showtimes', queryset=upcoming_showtimes)
+                ).distinct())
+        
+        
+        

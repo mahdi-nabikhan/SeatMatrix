@@ -138,3 +138,14 @@ class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
                 {'detail': 'این فیلم در سانس‌ها استفاده شده است؛ بنابراین غیرفعال شد.'},
                 status=status.HTTP_200_OK,
             )
+            
+            
+            
+
+
+class ActiveMovieShowTimeListApiView(generics.ListAPIView):
+    serializer_class = MovieListSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    
+    queryset = Movie.objects.filter(is_active = True).select_related()

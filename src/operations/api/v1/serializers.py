@@ -5,6 +5,7 @@ from operations.models import Seat, Address, CinemaBranch, CinemaBranchImage,Hal
 from .permissions import is_tenant_manager, is_tenant_staff
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from cinemas.models import Movie
 
 
 
@@ -430,3 +431,28 @@ class ShowtimeUpdateSerializer(serializers.ModelSerializer):
         if value <= timezone.now():
             raise serializers.ValidationError('زمان شروع سانس باید در آینده باشد.')
         return value
+    
+    
+    
+    
+    
+
+
+
+class MovieShowtimeInlineSerializer(serializers.ModelSerializer):
+    hall_name = serializers.CharField(source='hall.name', read_only=True)
+    hall_type = serializers.CharField(source='hall.get_hall_type_display', read_only=True)
+    branch_name = serializers.CharField(source='hall.branch.branch_name', read_only=True)
+
+    class Meta:
+        model = Showtime
+        fields = ['id', 'start_time', 'base_price', 'hall', 'hall_name', 'hall_type', 'branch_name']
+
+
+class ActiveMovieWithShowtimesSerializer(serializers.ModelSerializer):
+    showtimes = MovieShowtimeInlineSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Movie
+        fields = ['id', 'title', 'poster', 'duration', 'genre', 'showtimes']
+        # فیلدهای Movie رو مطابق مدل خودت تنظیم کن
