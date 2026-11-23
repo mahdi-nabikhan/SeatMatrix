@@ -1,3 +1,4 @@
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.db.models import Prefetch
@@ -93,8 +94,8 @@ class CinemaBranchManageApiView(generics.GenericAPIView):
         return Response({'detail': 'شعبه با موفقیت بروزرسانی شد'}, status=status.HTTP_200_OK)
     
     
-    def delete(self,request,pk):
-        if not IsCinemaManager().has_permission(self,request):
+    def delete(self, request, pk):
+        if not IsCinemaManager().has_permission(request, self):
             return Response({'detail': 'فقط مدیر سینما مجاز به حذف شعبه است.'}, status=status.HTTP_403_FORBIDDEN)
         obj = self.get_object()
         obj.is_active = False
@@ -106,6 +107,7 @@ class CinemaBranchManageApiView(generics.GenericAPIView):
 class CinemaBranchImageCreateApiView(generics.CreateAPIView):
     serializer_class = CinemaBranchImageCreateSerializer
     permission_classes = [permissions.IsAuthenticated, IsManagerOrBranchAdmin]
+    parser_classes = [MultiPartParser, FormParser]
 
 
 class CinemaBranchImageManageApiView(generics.RetrieveUpdateDestroyAPIView):
@@ -119,33 +121,37 @@ class CinemaBranchImageManageApiView(generics.RetrieveUpdateDestroyAPIView):
 #=============== Hall ===========================
 class HallListApiView(generics.ListAPIView):
     serializer_class = HallListSerializer
-    permission_classes =[permissions.AllowAny]
-    
-    
+    permission_classes = [permissions.AllowAny]
+
     def get_queryset(self):
         queryset = Hall.objects.filter(is_active=True).select_related('branch')
         branch_id = self.request.query_params.get('branch')
-        
         if branch_id:
-            queryset.filter(branch_id=branch_id)
+            queryset = queryset.filter(branch_id=branch_id)
         return queryset
-    
-    
-    
+
+
 class HallDetailApiView(generics.RetrieveAPIView):
     serializer_class = HallDetailSerializer
     queryset = Hall.objects.select_related('branch__address').prefetch_related('gallery_images')
-    permission_classes = [permissions.IsAuthenticated,IsManagerOrBranchAdmin] 
-    
-    def post(self,request,pk):
-        serializer = self.get_serializer(data=request.data,
-                                         context ={'request':request,
-                                                   'pk': pk})
+    permission_classes = [permissions.AllowAny]
+
+
+class HallRegisterApiView(generics.GenericAPIView):
+    serializer_class = HallRegisterSerializer
+    permission_classes = [permissions.IsAuthenticated, IsManagerOrBranchAdmin]
+
+    def post(self, request, pk):
+        serializer = self.get_serializer(
+            data=request.data,
+            context={'request': request, 'pk': pk},
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({'detail': 'سالن با موفقیت اضافه شد', 'data': serializer.data}, status=status.HTTP_201_CREATED)
-    
-    
+        return Response(
+            {'detail': 'سالن با موفقیت اضافه شد', 'data': serializer.data},
+            status=status.HTTP_201_CREATED,
+        )
     
 
 
@@ -295,20 +301,28 @@ class ShowtimeSeatStatusUpdateApiView(generics.UpdateAPIView):
 
 class ActiveMovieShowTimeListApiView(generics.ListAPIView):
     serializer_class = ActiveMovieWithShowtimesSerializer
-    permission_classes =  [permissions.AllowAny]
-    
-    
-    
+    permission_classes = [permissions.AllowAny]
+
     def get_queryset(self):
         now = timezone.now()
         upcoming_showtimes = (
-            Showtime.objects.filter(start_time_gte=now,hall_is_active=True,hall__branch_is_active=True).select_related('hall__branch').order_by('start_time'))
-        return (Movie.objects.filter(is_active=True,
+            Showtime.objects
+            .filter(
+                start_time__gte=now,
+                hall__is_active=True,
+                hall__branch__is_active=True,
+            )
+            .select_related('hall__branch')
+            .order_by('start_time')
+        )
+        return (
+            Movie.objects
+            .filter(
+                is_active=True,
                 showtimes__start_time__gte=now,
                 showtimes__hall__is_active=True,
-                showtimes__hall__branch__is_active=True,).prefetch_related(
-                    Prefetch('showtimes', queryset=upcoming_showtimes)
-                ).distinct())
-        
-        
-        
+                showtimes__hall__branch__is_active=True,
+            )
+            .prefetch_related(Prefetch('showtimes', queryset=upcoming_showtimes))
+            .distinct()
+        )
