@@ -1,6 +1,6 @@
 from django.db import models
 from cinemas.models import Movie
-
+from profiles.models import Staff
 
 class Address(models.Model):
     province = models.CharField(max_length=50, verbose_name="Province/State")
@@ -25,7 +25,11 @@ class CinemaBranch(models.Model):
     phone_number = models.CharField(max_length=15, null=True, blank=True)
     facilities = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
-
+    branch_admins = models.ManyToManyField(
+        Staff,
+        related_name='managed_branches',
+        blank=True,
+    )
     def __str__(self):
         return self.branch_name
 

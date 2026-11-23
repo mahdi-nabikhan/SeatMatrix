@@ -454,5 +454,5 @@ class ActiveMovieWithShowtimesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Movie
-        fields = ['id', 'title', 'poster', 'duration', 'genre', 'showtimes']
+        fields = ['id', 'title', 'poster', 'duration_minutes', 'showtimes']
         

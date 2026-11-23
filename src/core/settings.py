@@ -228,3 +228,9 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+
+
+BASE_DOMAIN = 'lvh.me'
+COOKIE_DOMAIN = '.lvh.me'
+ALLOWED_HOSTS = ['.lvh.me', '.localhost', '127.0.0.1']

@@ -202,13 +202,12 @@ class HallImageManageApiView(generics.RetrieveUpdateDestroyAPIView):
     
     
 # ======= Seat ==========
-class SeatListApiview(generics.ListAPIView):
+class SeatListApiView(generics.ListAPIView):
     serializer_class = SeatSerializer
     permission_classes = [permissions.AllowAny]
-    
+
     def get_queryset(self):
-        return Seat.objects.filter(hall_id=self.kwargs['hall_pk']).order_by('row_label','seat_number')
-    
+        return Seat.objects.filter(hall_id=self.kwargs['hall_pk']).order_by('row_label', 'seat_number')
     
     
 class SeatCreateApiView(generics.CreateAPIView):
