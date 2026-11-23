@@ -1,10 +1,10 @@
 from django.db import transaction
 from rest_framework.exceptions import PermissionDenied
 from rest_framework import serializers
-from operations.models import Seat, Address, CinemaBranch, CinemaBranchImage,Hall,HallImage
+from operations.models import Seat, Address, CinemaBranch, CinemaBranchImage,Hall,HallImage,Showtime, ShowtimeSeat
 from .permissions import is_tenant_manager, is_tenant_staff
 from django.shortcuts import get_object_or_404
-
+from django.utils import timezone
 
 
 
@@ -28,7 +28,7 @@ class CinemasBranchRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CinemaBranch
         fields = '__all__'
-        read_only_fileds = ['id','is_active']
+        read_only_fields = ['id','is_active']
         
         
         
@@ -224,25 +224,25 @@ class SeatSerializer(serializers.ModelSerializer):
         
         
         
-        def validate_hall(self,hall):
-            request = self.context['request']
-            user = request.user
-            tenant = request.tenant
+    def validate_hall(self,hall):
+        request = self.context['request']
+        user = request.user
+        tenant = request.tenant
             
             
-            is_manager= is_tenant_manager(user,tenant)
-            is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and hall.branch.branch_admins.filter(id=user.id).exists())
-            if not (is_manager or is_branch_admin):
-                raise serializers.ValidationError('شما اجازه مدیریت صندلی‌های این سالن را ندارید.')
-            return hall
+        is_manager= is_tenant_manager(user,tenant)
+        is_branch_admin = (
+        is_tenant_staff(user, tenant)
+        and hall.branch.branch_admins.filter(id=user.id).exists())
+        if not (is_manager or is_branch_admin):
+            raise serializers.ValidationError('شما اجازه مدیریت صندلی‌های این سالن را ندارید.')
+        return hall
         
-        def validate(self, attrs):
-            hall = attrs.get('hall') or getattr(self.instance, 'hall', None)
-            if self.instance is None and hall and hall.seats.count() >= hall.capacity:
-                raise serializers.ValidationError('ظرفیت صندلی‌های این سالن تکمیل شده است.')
-            return attrs
+    def validate(self, attrs):
+        hall = attrs.get('hall') or getattr(self.instance, 'hall', None)
+        if self.instance is None and hall and hall.seats.count() >= hall.capacity:
+            raise serializers.ValidationError('ظرفیت صندلی‌های این سالن تکمیل شده است.')
+        return attrs
         
         
 class SeatUpdateSerializer(serializers.ModelSerializer):
@@ -315,11 +315,6 @@ class SeatBulkCreateSerializer(serializers.Serializer):
     
     
     
-from django.db import transaction
-from django.utils import timezone
-from rest_framework import serializers
-from operations.models import Showtime, ShowtimeSeat
-from .permissions import is_tenant_manager, is_tenant_staff
 
 
 class ShowtimeSeatSerializer(serializers.ModelSerializer):
