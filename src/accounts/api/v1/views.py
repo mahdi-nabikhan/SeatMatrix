@@ -68,6 +68,7 @@ class EmailJwtLoginApiView (TokenObtainPairView):
             httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            domain=settings.COOKIE_DOMAIN,
         )
         
         response.set_cookie(
@@ -78,6 +79,7 @@ class EmailJwtLoginApiView (TokenObtainPairView):
             httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            domain=settings.COOKIE_DOMAIN,
         )
 
         return response
@@ -125,6 +127,7 @@ class UsernameJwtLoginAPIview(generics.GenericAPIView):
             httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            domain=settings.COOKIE_DOMAIN,
         )
         
         
@@ -136,6 +139,7 @@ class UsernameJwtLoginAPIview(generics.GenericAPIView):
             httponly=simple_jwt_settings.get('AUTH_COOKIE_HTTP_ONLY', True),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
+            domain=settings.COOKIE_DOMAIN,
         )
 
         return response
@@ -164,12 +168,14 @@ class LogoutApiView(generics.GenericAPIView):
             key=simple_jwt_settings.get('AUTH_COOKIE', 'access_token'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+            domain=settings.COOKIE_DOMAIN,
         )
         
         response.delete_cookie(
             key=simple_jwt_settings.get('AUTH_COOKIE_REFRESH', 'refresh_token'),
             path=simple_jwt_settings.get('AUTH_COOKIE_PATH', '/'),
             samesite=simple_jwt_settings.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+            domain=settings.COOKIE_DOMAIN,
         )
         return response
     

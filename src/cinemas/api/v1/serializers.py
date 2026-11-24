@@ -1,8 +1,9 @@
 from rest_framework import serializers
 from profiles.models import Manager
-from cinemas.models import Cinema
+from cinemas.models import Cinema,Movie,MovieImage
 from profiles.api.v1.manager import serializers as manager_serializer
 from django.db import transaction
+from rest_framework.exceptions import NotFound
 
 
 
@@ -48,4 +49,77 @@ class CinemaUpdateSerializer(serializers.ModelSerializer):
             model = Cinema
             fields = ['name','image','description','created_at']
             read_only_fields = ['created_at']
+            
+            
+            
     
+        
+
+class MovieImageListSerializer(serializers.ModelSerializer):
+    movie_title = serializers.CharField(source='movie.title', read_only=True)
+
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'movie', 'movie_title', 'image', 'caption', 'uploaded_at']
+
+
+
+class RegisterMovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = '__all__'
+        read_only_fields = ['created_by_cinema', 'created_at', 'is_active']
+
+    def create(self, validated_data):
+        request = self.context['request']
+        validated_data['created_by_cinema'] = request.tenant
+        return super().create(validated_data)
+    
+class MovieListSerializer(serializers.ModelSerializer):
+    created_by_cinema_name = serializers.CharField(
+        source='created_by_cinema.name',
+        read_only=True
+    )
+    class Meta:
+            model = Movie
+            fields = [
+            'id', 'title', 'duration_minutes', 'poster',
+            'is_active', 'created_by_cinema', 'created_by_cinema_name', 'created_at']
+    
+class MovieDetailSerializer(serializers.ModelSerializer):
+    created_by_cinema_name = serializers.CharField(
+        source='created_by_cinema.name',
+        read_only=True
+    )
+    gallery_images = MovieImageListSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Movie
+        fields = '__all__'
+
+
+class UpdateMovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = '__all__'
+        read_only_fields = ['id', 'created_by_cinema', 'created_at']
+
+
+class MovieImageCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'movie', 'image', 'caption']
+        read_only_fields = ['id']
+
+
+class MovieImageUpdateSerializer(serializers.ModelSerializer):
+    image = serializers.ImageField(required=False)
+
+    class Meta:
+        model = MovieImage
+        fields = ['id', 'image', 'caption']
+        read_only_fields = ['id']
+        
+        
+        
+
