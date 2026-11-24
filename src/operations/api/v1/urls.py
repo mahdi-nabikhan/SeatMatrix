@@ -25,7 +25,12 @@ from .views import (
     ShowtimeCreateApiView,
     ShowtimeManageApiView,
     ShowtimeSeatStatusUpdateApiView,
-    ActiveMovieShowTimeListApiView
+    ActiveMovieShowTimeListApiView,
+    BranchAdminListApiView,
+    BranchAdminRegisterApiView,
+    BranchAdminRemoveApiView
+    
+    
 )
 
 urlpatterns = [
@@ -58,4 +63,7 @@ urlpatterns = [
     path('showtimes/<int:pk>/manage/', ShowtimeManageApiView.as_view(), name='showtime-manage'),
     path('showtime-seats/<int:pk>/status/', ShowtimeSeatStatusUpdateApiView.as_view(), name='showtime-seat-status'),
     path('movies/active-showtimes/', ActiveMovieShowTimeListApiView.as_view(), name='active-movie-showtimes'),
+    path('branches/<int:branch_id>/admins/', BranchAdminListApiView.as_view(), name='branch-admin-list'),
+    path('branches/<int:branch_id>/admins/register/', BranchAdminRegisterApiView.as_view(), name='branch-admin-register'),
+    path('branches/<int:branch_id>/admins/<int:staff_id>/', BranchAdminRemoveApiView.as_view(), name='branch-admin-remove'),
 ]

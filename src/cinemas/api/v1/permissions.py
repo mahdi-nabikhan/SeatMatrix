@@ -1,6 +1,28 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
+class IsCinemaManager(BasePermission):
+    """فقط منیجر سینمای فعلی (روی اسکیمای تننت)"""
+
+    def has_permission(self, request, view):
+        user = request.user
+        tenant = request.tenant
+
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_superuser:
+            return True
+
+        if not tenant or tenant.schema_name == 'public':
+            return False
+
+        manager_profile = getattr(user, 'manager_profile', None)
+        return bool(
+            manager_profile and getattr(tenant, 'manager_id', None) == manager_profile.id
+        )
+
+
 class IsCinemaManagerOrStaffForMovie(BasePermission):
     """
     - GET/HEAD/OPTIONS: برای همه آزاد
@@ -15,8 +37,11 @@ class IsCinemaManagerOrStaffForMovie(BasePermission):
         if user.is_superuser:
             return True
 
+        if not tenant or tenant.schema_name == 'public':
+            return False
+
         manager_profile = getattr(user, 'manager_profile', None)
-        if manager_profile and getattr(manager_profile, 'cinema', None) == tenant:
+        if manager_profile and getattr(tenant, 'manager_id', None) == manager_profile.id:
             return True
 
         staff_profile = getattr(user, 'staff_profile', None)
@@ -38,7 +63,5 @@ class IsCinemaManagerOrStaffForMovie(BasePermission):
             return True
 
         movie = obj.movie if hasattr(obj, 'movie') else obj
-
-  
         is_owner_cinema = (movie.created_by_cinema_id == request.tenant.id)
         return is_owner_cinema and self._is_tenant_manager_or_staff(request.user, request.tenant)
