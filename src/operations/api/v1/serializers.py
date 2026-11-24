@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from cinemas.models import Movie
 from django.contrib.auth import get_user_model
+from profiles.models import Staff
 User = get_user_model()
 
 
@@ -502,4 +503,26 @@ class BranchAdminRegisterSerializer(serializers.Serializer):
         branch.branch_admins.add(staff)
         return staff
         
-    
+        
+        
+
+
+class HallSerializer(serializers.ModelSerializer):
+    hall_type_display = serializers.CharField(source='get_hall_type_display', read_only=True)
+
+    class Meta:
+        model = Hall
+        fields = [
+            'id',
+            'branch',
+            'name',
+            'hall_type',
+            'hall_type_display',
+            'image',
+            'capacity',
+            'is_active',
+        ]
+        read_only_fields = ['id', 'branch', 'hall_type_display']
+        
+        
+  

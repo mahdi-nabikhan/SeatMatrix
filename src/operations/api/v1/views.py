@@ -1,4 +1,4 @@
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -40,7 +40,8 @@ from .serializers import (
     ShowtimeUpdateSerializer,
     ShowtimeSeatStatusUpdateSerializer,
     ActiveMovieWithShowtimesSerializer,
-    BranchAdminRegisterSerializer
+    BranchAdminRegisterSerializer,
+    HallSerializer
 )
 
 # ==================== CinemaBranch ====================
@@ -384,3 +385,69 @@ class BranchAdminRemoveApiView(generics.DestroyAPIView):
         staff = get_object_or_404(branch.branch_admins, id=staff_id)
         branch.branch_admins.remove(staff)
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    
+    
+    
+class  BranchHallListCreateApiView(generics.ListCreateAPIView):
+    
+    
+    serializer_class =HallSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_branch(self):
+        return get_object_or_404(CinemaBranch,id=self.kwargs['branch_id'])
+    
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [IsManagerOrBranchAdmin()]
+    
+    
+    def get_queryset(self):
+        branch= self.get_branch()
+        qs = Hall.objects.filter(branch=branch)
+        user= self.request.user
+        
+        is_manager= IsCinemaManager().has_permission(self.request,self)
+        staff_profile = getattr(user, 'staff_profile', None)
+        is_this_branch_admin = bool(
+            staff_profile
+            and staff_profile.is_active
+            and branch.branch_admins.filter(id=staff_profile.id).exists()
+        )
+        
+        
+        if is_manager or is_this_branch_admin:
+            return qs
+        
+        return qs.filter(is_active=True)
+    
+    
+    
+    def perform_create(self, serializer):
+        branch=self.get_branch()
+        self.check_object_permissions(self.request,branch)
+        serializer.save(branch = branch)
+        
+        
+        
+class HallDetailApiView(generics.RetrieveUpdateDestroyAPIView):
+    queryset= Hall.objects.select_related('branch')
+    serializer_class = HallSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    lookup_url_kwarg = 'hall_id'
+    
+    
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        
+        if self.request.method == 'DELETE':
+            return [IsCinemaManager()]
+        return [IsManagerOrBranchAdmin()]
+    
+    
+    
+    
+    

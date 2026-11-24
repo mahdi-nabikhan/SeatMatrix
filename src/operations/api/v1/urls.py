@@ -28,7 +28,9 @@ from .views import (
     ActiveMovieShowTimeListApiView,
     BranchAdminListApiView,
     BranchAdminRegisterApiView,
-    BranchAdminRemoveApiView
+    BranchAdminRemoveApiView,
+    HallDetailSerializer,
+    BranchHallListCreateApiView
     
     
 )
@@ -66,4 +68,9 @@ urlpatterns = [
     path('branches/<int:branch_id>/admins/', BranchAdminListApiView.as_view(), name='branch-admin-list'),
     path('branches/<int:branch_id>/admins/register/', BranchAdminRegisterApiView.as_view(), name='branch-admin-register'),
     path('branches/<int:branch_id>/admins/<int:staff_id>/', BranchAdminRemoveApiView.as_view(), name='branch-admin-remove'),
+    path('branches/<int:branch_id>/halls/', BranchHallListCreateApiView.as_view(), name='branch-hall-list-create'),
+    path('halls/<int:hall_id>/', HallDetailApiView.as_view(), name='hall-detail'),
+
+
+
 ]
