@@ -84,7 +84,7 @@ def checkout_cart_to_order(*, customer) -> Order:
     if not showtime:
         raise ValidationError("سانس مورد نظر یافت نشد.")
 
-    # قفل ردیف‌ها به ترتیب ID در Postgres (لایه دفاع دوم و ضد Deadlock)
+    
     seats = list(
         ShowtimeSeat.objects.select_for_update()
         .filter(showtime=showtime, id__in=seat_ids)
