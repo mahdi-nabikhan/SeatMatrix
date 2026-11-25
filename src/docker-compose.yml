@@ -1,4 +1,14 @@
 services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: seatmatrix_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
   db:
     image: postgres:15-alpine
     container_name: seatmatrix_postgres
@@ -15,7 +25,6 @@ services:
   web:
     build: .
     container_name: seatmatrix_django
-    # اینجا آی‌پی به 0.0.0.0 و پورت به 8088 اصلاح شد
     command: python manage.py runserver 0.0.0.0:8088
     volumes:
       - .:/app  
@@ -23,6 +32,7 @@ services:
       - "8088:8088"
     depends_on:
       - db
+      - redis
     environment:
       - DB_HOST=db
       - DB_NAME=seatmatrix_db
@@ -46,3 +56,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  redis_data:

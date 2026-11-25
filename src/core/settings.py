@@ -234,3 +234,17 @@ STORAGES = {
 BASE_DOMAIN = 'lvh.me'
 COOKIE_DOMAIN = '.lvh.me'
 ALLOWED_HOSTS = ['.lvh.me', '.localhost', '127.0.0.1']
+
+
+
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+}
