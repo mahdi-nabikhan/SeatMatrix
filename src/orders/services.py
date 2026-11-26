@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 
 from operations.models import Showtime,ShowtimeSeat
 from orders.models import Order,Ticket
+from promotions.services import apply_promotions
 from orders.redis_locks import (
     HOLD_TTL_SECONDS,
     get_cart,
@@ -66,7 +67,7 @@ def hold_showtime_seats (
 
 
 @transaction.atomic
-def checkout_cart_to_order(*, customer) -> Order:
+def checkout_cart_to_order(*, customer, coupon_code: str | None = None) -> Order:
     owner_id = f"user:{customer.user_id}"
     cart = get_cart(owner_id)
     if not cart:
@@ -84,7 +85,6 @@ def checkout_cart_to_order(*, customer) -> Order:
     if not showtime:
         raise ValidationError("سانس مورد نظر یافت نشد.")
 
-    
     seats = list(
         ShowtimeSeat.objects.select_for_update()
         .filter(showtime=showtime, id__in=seat_ids)
@@ -97,14 +97,27 @@ def checkout_cart_to_order(*, customer) -> Order:
     if already_sold:
         raise ValidationError(f"صندلی‌های زیر قبلاً فروخته شده‌اند: {already_sold}")
 
+    # ۱. محاسبه مبلغ کل
     total_amount = showtime.base_price * len(seats)
+
+    # ۲. اعمال تخفیف (دقیقاً اینجا، بعد از قفل صندلی‌ها و محاسبه total_amount)
+    promo_result = apply_promotions(
+        total_amount=total_amount,
+        showtime_start_time=showtime.start_time,
+        coupon_code=coupon_code,
+        consume=True,
+    )
+    discount_amount = promo_result['discount_amount']
+    final_amount = promo_result['final_amount']
+
+    # ۳. ثبت سفارش با مبلغ نهایی و تخفیف واقعی
     order = Order.objects.create(
         customer=customer,
         order_number=_generate_order_number(),
         status='PAID',
         total_amount=total_amount,
-        discount_amount=0,
-        final_amount=total_amount,
+        discount_amount=discount_amount,
+        final_amount=final_amount,
     )
 
     Ticket.objects.bulk_create([
@@ -117,7 +130,6 @@ def checkout_cart_to_order(*, customer) -> Order:
     ])
 
     ShowtimeSeat.objects.filter(id__in=seat_ids).update(status='SOLD')
-
 
     transaction.on_commit(lambda: release_cart(owner_id))
 
