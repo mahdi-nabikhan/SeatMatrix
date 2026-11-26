@@ -248,3 +248,14 @@ CACHES = {
         },
     }
 }
+
+
+
+
+# ==================== Payment Gateway (ZarinPal v4) ====================
+ZARINPAL_MERCHANT_ID = os.getenv(
+    'ZARINPAL_MERCHANT_ID',
+    '12345678-1234-1234-1234-123456789012',
+)
+ZARINPAL_SANDBOX = os.getenv('ZARINPAL_SANDBOX', 'True').lower() == 'true'
+ZARINPAL_CURRENCY = os.getenv('ZARINPAL_CURRENCY', 'IRT')  

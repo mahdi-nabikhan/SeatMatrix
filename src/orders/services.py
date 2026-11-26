@@ -93,14 +93,12 @@ def checkout_cart_to_order(*, customer, coupon_code: str | None = None) -> Order
     if len(seats) != len(seat_ids):
         raise ValidationError("صندلی‌های انتخاب‌شده نامعتبر هستند.")
 
-    already_sold = [s.id for s in seats if s.status == 'SOLD']
-    if already_sold:
-        raise ValidationError(f"صندلی‌های زیر قبلاً فروخته شده‌اند: {already_sold}")
+    already_unavailable = [s.id for s in seats if s.status != 'AVAILABLE']
+    if already_unavailable:
+        raise ValidationError(f"صندلی‌های زیر در دسترس نیستند: {already_unavailable}")
 
-    # ۱. محاسبه مبلغ کل
     total_amount = showtime.base_price * len(seats)
 
-    # ۲. اعمال تخفیف (دقیقاً اینجا، بعد از قفل صندلی‌ها و محاسبه total_amount)
     promo_result = apply_promotions(
         total_amount=total_amount,
         showtime_start_time=showtime.start_time,
@@ -110,11 +108,11 @@ def checkout_cart_to_order(*, customer, coupon_code: str | None = None) -> Order
     discount_amount = promo_result['discount_amount']
     final_amount = promo_result['final_amount']
 
-    # ۳. ثبت سفارش با مبلغ نهایی و تخفیف واقعی
+    is_free_order = final_amount == 0
     order = Order.objects.create(
         customer=customer,
         order_number=_generate_order_number(),
-        status='PAID',
+        status='PAID' if is_free_order else 'PENDING',
         total_amount=total_amount,
         discount_amount=discount_amount,
         final_amount=final_amount,
@@ -129,8 +127,9 @@ def checkout_cart_to_order(*, customer, coupon_code: str | None = None) -> Order
         for seat in seats
     ])
 
-    ShowtimeSeat.objects.filter(id__in=seat_ids).update(status='SOLD')
+    ShowtimeSeat.objects.filter(id__in=seat_ids).update(
+        status='SOLD' if is_free_order else 'RESERVED'
+    )
 
     transaction.on_commit(lambda: release_cart(owner_id))
-
     return order
