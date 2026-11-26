@@ -1,14 +1,14 @@
-from django.db import transaction
+from django.db import connection, transaction
 from rest_framework.exceptions import ValidationError
 
+from notifications.tasks import send_order_confirmation_task
 from operations.models import ShowtimeSeat
-from orders.models import Order, Ticket
+from orders.models import Order
 from payments.gateways import GatewayError, ZarinpalGateway
 from payments.models import Transaction
 
 
 def _release_order_seats(order: Order) -> None:
-    
     seat_ids = list(order.tickets.values_list('showtime_seat_id', flat=True))
     order.tickets.all().delete()
     if seat_ids:
@@ -72,13 +72,11 @@ def verify_payment(
     if not tx:
         raise ValidationError({'detail': 'تراکنش با این شناسه یافت نشد.'})
 
-    # Idempotency: اگر کاربر صفحه کال‌بک را چند بار رفرش کرد
     if tx.status == 'SUCCESS':
         return tx
 
     order = Order.objects.select_for_update().get(pk=tx.order_id)
 
-   
     if gateway_status != 'OK':
         tx.status = 'FAILED'
         tx.response_code = 'CANCELLED_BY_USER'
@@ -122,6 +120,12 @@ def verify_payment(
         seat_ids = list(order.tickets.values_list('showtime_seat_id', flat=True))
         if seat_ids:
             ShowtimeSeat.objects.filter(id__in=seat_ids).update(status='SOLD')
+
+        current_schema = connection.schema_name
+        order_id = order.id
+        transaction.on_commit(
+            lambda: send_order_confirmation_task.delay(current_schema, order_id)
+        )
     else:
         tx.status = 'FAILED'
         tx.response_code = result['code']

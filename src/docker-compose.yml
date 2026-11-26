@@ -9,6 +9,8 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+
+  
   db:
     image: postgres:15-alpine
     container_name: seatmatrix_postgres
@@ -21,6 +23,28 @@ services:
       - "5455:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  celery_worker:
+    build: .
+    command: celery -A core worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  celery_beat:
+    build: .
+    command: celery -A core beat -l info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
 
   web:
     build: .

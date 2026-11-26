@@ -1,10 +1,11 @@
 import secrets
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from operations.models import Showtime,ShowtimeSeat
-from orders.models import Order,Ticket
+from notifications.tasks import send_order_confirmation_task
+from operations.models import Showtime, ShowtimeSeat
+from orders.models import Order, Ticket
 from promotions.services import apply_promotions
 from orders.redis_locks import (
     HOLD_TTL_SECONDS,
@@ -15,27 +16,23 @@ from orders.redis_locks import (
 )
 
 
-
-
-def _generate_order_number()-> str :
+def _generate_order_number() -> str:
     timestamp = timezone.now().strftime('%y%m%d%H%M')
     random_part = secrets.token_hex(3).upper()
     return f"ORD-{timestamp}{random_part}"
 
 
-
-def hold_showtime_seats (
+def hold_showtime_seats(
     *,
-    owner_id:str,
-    showtime_id:int,
-    showtime_seat_ids:list[int]) -> dict:
+    owner_id: str,
+    showtime_id: int,
+    showtime_seat_ids: list[int],
+) -> dict:
     if not showtime_seat_ids:
         raise ValidationError('حداقل یک صندلی باید انتخاب شود')
-    
-    
+
     unique_seat_ids = sorted(set(showtime_seat_ids))
-    
-    
+
     showtime = Showtime.objects.filter(id=showtime_id).first()
     if not showtime:
         raise ValidationError("سانس مورد نظر یافت نشد.")
@@ -44,9 +41,9 @@ def hold_showtime_seats (
     if len(seats) != len(unique_seat_ids):
         raise ValidationError("یک یا چند صندلی متعلق به این سانس نیست.")
 
-    sold_ids = [s.id for s in seats if s.status == 'SOLD']
-    if sold_ids:
-        raise ValidationError(f"صندلی‌های زیر قبلاً فروخته شده‌اند: {sold_ids}")
+    unavailable_ids = [s.id for s in seats if s.status != 'AVAILABLE']
+    if unavailable_ids:
+        raise ValidationError(f"صندلی‌های زیر در دسترس نیستند: {unavailable_ids}")
 
     acquired = hold_seats_in_redis(
         owner_id=owner_id,
@@ -62,8 +59,6 @@ def hold_showtime_seats (
         "expires_in_seconds": HOLD_TTL_SECONDS,
         "estimated_total": showtime.base_price * len(unique_seat_ids),
     }
-    
-
 
 
 @transaction.atomic
@@ -132,4 +127,12 @@ def checkout_cart_to_order(*, customer, coupon_code: str | None = None) -> Order
     )
 
     transaction.on_commit(lambda: release_cart(owner_id))
+
+    if is_free_order:
+        current_schema = connection.schema_name
+        order_id = order.id
+        transaction.on_commit(
+            lambda: send_order_confirmation_task.delay(current_schema, order_id)
+        )
+
     return order

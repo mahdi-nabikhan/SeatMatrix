@@ -5,6 +5,7 @@ Django settings for core project.
 from pathlib import Path
 from datetime import timedelta
 import os
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -259,3 +260,29 @@ ZARINPAL_MERCHANT_ID = os.getenv(
 )
 ZARINPAL_SANDBOX = os.getenv('ZARINPAL_SANDBOX', 'True').lower() == 'true'
 ZARINPAL_CURRENCY = os.getenv('ZARINPAL_CURRENCY', 'IRT')  
+
+
+
+
+
+
+
+
+
+
+
+# ==================== Celery & Celery Beat ====================
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/1')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/1')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+
+CELERY_BEAT_SCHEDULE = {
+    'cancel-expired-pending-orders-every-5-mins': {
+        'task': 'orders.tasks.cancel_expired_pending_orders',
+        'schedule': crontab(minute='*/5'),
+    },
+}
