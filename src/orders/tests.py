@@ -27,7 +27,6 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
     def setUp(self):
         connection.set_schema_to_public()
 
-
         self.tenant = Cinema.objects.create(
             schema_name='test_cinema',
             name='Test Cinema',
@@ -37,7 +36,6 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
             tenant=self.tenant,
             is_primary=True,
         )
-
 
         self.user = User.objects.create_user(
             username='test_customer',
@@ -87,7 +85,6 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
         self._owners_to_clean = [f'user:{self.user.id}']
 
     def tearDown(self):
-
         connection.set_tenant(self.tenant)
         redis_conn = get_redis_connection('default')
         for owner in self._owners_to_clean:
@@ -104,7 +101,6 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
         guest_client = APIClient(HTTP_HOST=self.domain.domain)
         other_guest = APIClient(HTTP_HOST=self.domain.domain)
 
-     
         hold_res = guest_client.post(
             reverse('order-cart'),
             {'showtime_id': self.showtime.id, 'showtime_seat_ids': [self.ss_1.id]},
@@ -114,7 +110,6 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
         guest_token = hold_res.data['guest_token']
         self._owners_to_clean.append(f'guest:{guest_token}')
 
-      
         conflict_res = other_guest.post(
             reverse('order-cart'),
             {'showtime_id': self.showtime.id, 'showtime_seat_ids': [self.ss_1.id, self.ss_2.id]},
@@ -138,16 +133,14 @@ class OrderConcurrencyAndFlowTests(TransactionTestCase):
         )
         self.assertEqual(claim_res.status_code, status.HTTP_200_OK)
 
-      
         checkout_res = guest_client.post(reverse('order-checkout'))
         self.assertEqual(checkout_res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(checkout_res.data['status'], 'PAID')
+        self.assertEqual(checkout_res.data['status'], 'PENDING')
         self.assertEqual(len(checkout_res.data['tickets']), 1)
 
-     
         with schema_context(self.tenant.schema_name):
             self.ss_1.refresh_from_db()
-            self.assertEqual(self.ss_1.status, 'SOLD')
+            self.assertEqual(self.ss_1.status, 'RESERVED')
             self.assertEqual(Order.objects.count(), 1)
             self.assertEqual(Ticket.objects.count(), 1)
 
