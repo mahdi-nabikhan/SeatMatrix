@@ -6,7 +6,9 @@ from .permissions import is_tenant_manager, is_tenant_staff
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from cinemas.models import Movie
-
+from django.contrib.auth import get_user_model
+from profiles.models import Staff
+User = get_user_model()
 
 
 class CinemaAddressSerializer(serializers.ModelSerializer):
@@ -456,3 +458,71 @@ class ActiveMovieWithShowtimesSerializer(serializers.ModelSerializer):
         model = Movie
         fields = ['id', 'title', 'poster', 'duration_minutes', 'showtimes']
         
+        
+        
+        
+
+
+class BranchAdminRegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    username = serializers.CharField(max_length=150)
+    phone_number = serializers.CharField(max_length=15)
+    password = serializers.CharField(write_only=True, min_length=8)
+    shift = serializers.ChoiceField(choices=Staff.SHIFT_CHOICES, default='MORNING')
+    
+    
+    
+    def validate_email(self,value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('این ایمیل قبلاً ثبت شده است.')
+        return value
+    
+    
+    def validate_username(self,value):
+        if User.objects.filter(username=value).exists():
+           raise serializers.ValidationError('این نام کاربری قبلاً ثبت شده است.')
+        return value
+        
+    def validate_phone_number(self, value):
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError('این شماره موبایل قبلاً ثبت شده است.')
+        return value
+    
+    
+    @transaction.atomic
+    def create(self, validated_data):
+        branch = self.context['branch']
+        tenant = self.context['request'].tenant
+        
+        
+        shift= validated_data.pop('shift')
+        password= validated_data.pop('password')
+        user= User.objects.create_user(password=password,**validated_data)
+        
+        staff = Staff.objects.create(user=user,cinema=tenant,shift=shift,is_active=True,)
+        branch.branch_admins.add(staff)
+        return staff
+        
+        
+        
+
+
+class HallSerializer(serializers.ModelSerializer):
+    hall_type_display = serializers.CharField(source='get_hall_type_display', read_only=True)
+
+    class Meta:
+        model = Hall
+        fields = [
+            'id',
+            'branch',
+            'name',
+            'hall_type',
+            'hall_type_display',
+            'image',
+            'capacity',
+            'is_active',
+        ]
+        read_only_fields = ['id', 'branch', 'hall_type_display']
+        
+        
+  

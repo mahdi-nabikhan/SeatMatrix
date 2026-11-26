@@ -12,10 +12,10 @@ class Order(models.Model):
         ('REFUNDED', 'Refunded'),
     )
     
-    # ارجاع رشته‌ای برای جلوگیری از خطای Circular Import
+    
     customer = models.ForeignKey('profiles.Customer', on_delete=models.PROTECT, related_name='orders')
     
-    # کد پیگیری خوانا برای کاربر (مثل ORD-12345)
+   
     order_number = models.CharField(max_length=20, unique=True, db_index=True)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')

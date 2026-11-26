@@ -13,11 +13,11 @@ class SMSLog(models.Model):
     phone_number = models.CharField(max_length=15)
     message = models.TextField()
     
-    # اسم پنل پیامکی (مثلا Kavenegar یا Ghasedak)
+
     provider = models.CharField(max_length=50, default='Kavenegar')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     
-    # پاسخ دریافتی از سرور پیامک برای دیباگ کردن
+   
     provider_response = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
