@@ -80,11 +80,12 @@ class MovieListSerializer(serializers.ModelSerializer):
         source='created_by_cinema.name',
         read_only=True
     )
+    genre_display = serializers.CharField(source='get_genre_display', read_only=True)
     class Meta:
             model = Movie
             fields = [
             'id', 'title', 'duration_minutes', 'poster',
-            'is_active', 'created_by_cinema', 'created_by_cinema_name', 'created_at']
+            'is_active', 'created_by_cinema', 'created_by_cinema_name', 'created_at','genre_display']
     
 class MovieDetailSerializer(serializers.ModelSerializer):
     created_by_cinema_name = serializers.CharField(

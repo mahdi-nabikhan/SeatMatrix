@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from cinemas.models import Cinema
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
+from cinemas.recommendations import get_recommended_movies
+from rest_framework.views import APIView
+from django.db import connection
 from cinemas.api.v1.serializers import *
 from .permissions import *
 from cinemas.cache import (
@@ -183,3 +186,46 @@ class ActiveMovieShowTimeListApiView(generics.ListAPIView):
     
     
     queryset = Movie.objects.filter(is_active = True).select_related()
+    
+    
+    
+    
+
+
+class RecommendedMovieListApiView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get('limit', 10))
+        except ValueError:
+            limit = 10
+        limit = max(1, min(limit, 20))
+
+        rec = get_recommended_movies(
+            user=request.user,
+            schema_name=connection.schema_name,
+            limit=limit,
+        )
+
+        serialized = MovieListSerializer(
+            rec['movies'],
+            many=True,
+            context={'request': request},
+        ).data
+
+        for item in serialized:
+            mid = item['id']
+            item['recommendation_score'] = rec['scores'].get(mid, 0.0)
+            item['recommendation_reason'] = rec['reasons'].get(mid, '')
+
+        response = Response(
+            {
+                'strategy': rec['strategy'],
+                'count': len(serialized),
+                'results': serialized,
+            },
+            status=status.HTTP_200_OK,
+        )
+        response['X-Cache'] = 'HIT' if rec['cache_hit'] else 'MISS'
+        return response
