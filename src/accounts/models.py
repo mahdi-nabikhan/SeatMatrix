@@ -7,7 +7,22 @@ from datetime import timedelta
 
 
 class CustomUserManager(BaseUserManager):
+    """Custom manager for the User model using email as the primary identifier."""
     def create_user(self, username, email, password=None, **extra_fields):
+        """Create and persist a standard user with a normalized email and hashed password.
+
+        Args:
+            username: Unique username for the account.
+            email: Unique email address used for authentication.
+            password: Raw password string to hash before saving.
+            **extra_fields: Additional fields passed to the User model.
+
+        Returns:
+            The newly created User instance.
+
+        Raises:
+            ValueError: If username or email is missing.
+        """
         if not username:
             raise ValueError('The Username field must be set')
         if not email:
@@ -20,6 +35,20 @@ class CustomUserManager(BaseUserManager):
         return user
 
     def create_superuser(self, username, email, password=None, **extra_fields):
+        """Create and persist a superuser with staff and superuser privileges enabled.
+
+        Args:
+            username: Unique username for the superuser.
+            email: Unique email address for the superuser.
+            password: Raw password string to hash before saving.
+            **extra_fields: Additional fields passed to the User model.
+
+        Returns:
+            The newly created superuser instance.
+
+        Raises:
+            ValueError: If `is_staff` or `is_superuser` is explicitly set to False.
+        """
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
 
@@ -31,6 +60,7 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(username, email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
+    """Custom user model authenticating via email with unique username and optional phone."""
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
     
@@ -61,6 +91,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     
 class OTP(models.Model):
+    """One-time password record used for phone-based authentication.
+
+    Each code is valid for 2 minutes from creation and is invalidated once used.
+    """
     user = models.ForeignKey(
         'accounts.User', 
         on_delete=models.CASCADE, 
@@ -71,7 +105,8 @@ class OTP(models.Model):
     is_used = models.BooleanField(default=False)
 
     def is_valid(self):
-        
+        """Return True if the OTP is unused and within its 2-minute validity window."""
+
         expiration_time = self.created_at + timedelta(minutes=2)
         return not self.is_used and timezone.now() <= expiration_time
 
