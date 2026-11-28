@@ -1,38 +1,32 @@
 from django.urls import path
+
 from .views import (
-    # CinemaBranch
-    CinemaBranchListApiView,
-    CinemaBranchDetailApiView,
-    CinemaBranchRegisterApiView,
-    CinemaBranchManageApiView,
-    CinemaBranchImageCreateApiView,
-    CinemaBranchImageManageApiView,
-    # Hall
-    HallListApiView,
-    HallDetailApiView,
-    HallRegisterApiView,
-    HallManageApiView,
-    HallImageCreateApiView,
-    HallImageManageApiView,
-    # Seat
-    SeatListApiView,
-    SeatCreateApiView,
-    SeatBulkCreateApiView,
-    SeatManageApiView,
-    # Showtime & ShowtimeSeat
-    ShowtimeListApiView,
-    ShowtimeDetailApiView,
-    ShowtimeCreateApiView,
-    ShowtimeManageApiView,
-    ShowtimeSeatStatusUpdateApiView,
     ActiveMovieShowTimeListApiView,
     BranchAdminListApiView,
     BranchAdminRegisterApiView,
     BranchAdminRemoveApiView,
-    HallDetailSerializer,
-    BranchHallListCreateApiView
-    
-    
+    BranchHallListCreateApiView,
+    CinemaBranchDetailApiView,
+    CinemaBranchImageCreateApiView,
+    CinemaBranchImageManageApiView,
+    CinemaBranchListApiView,
+    CinemaBranchManageApiView,
+    CinemaBranchRegisterApiView,
+    HallDetailApiView,
+    HallImageCreateApiView,
+    HallImageManageApiView,
+    HallListApiView,
+    HallManageApiView,
+    HallRegisterApiView,
+    SeatBulkCreateApiView,
+    SeatCreateApiView,
+    SeatListApiView,
+    SeatManageApiView,
+    ShowtimeCreateApiView,
+    ShowtimeDetailApiView,
+    ShowtimeListApiView,
+    ShowtimeManageApiView,
+    ShowtimeSeatStatusUpdateApiView,
 )
 
 urlpatterns = [
@@ -44,10 +38,16 @@ urlpatterns = [
     path('branches/images/create/', CinemaBranchImageCreateApiView.as_view(), name='branch-image-create'),
     path('branches/images/<int:pk>/manage/', CinemaBranchImageManageApiView.as_view(), name='branch-image-manage'),
 
+    # ==================== Branch Admins ====================
+    path('branches/<int:branch_id>/admins/', BranchAdminListApiView.as_view(), name='branch-admin-list'),
+    path('branches/<int:branch_id>/admins/register/', BranchAdminRegisterApiView.as_view(), name='branch-admin-register'),
+    path('branches/<int:branch_id>/admins/<int:staff_id>/', BranchAdminRemoveApiView.as_view(), name='branch-admin-remove'),
+
     # ==================== Hall ====================
     path('halls/', HallListApiView.as_view(), name='hall-list'),
     path('branches/<int:pk>/halls/register/', HallRegisterApiView.as_view(), name='hall-register'),
-    path('halls/<int:pk>/', HallDetailApiView.as_view(), name='hall-detail'),
+    path('branches/<int:branch_id>/halls/', BranchHallListCreateApiView.as_view(), name='branch-hall-list-create'),
+    path('halls/<int:hall_id>/', HallDetailApiView.as_view(), name='hall-detail'),
     path('halls/<int:pk>/manage/', HallManageApiView.as_view(), name='hall-manage'),
     path('halls/images/create/', HallImageCreateApiView.as_view(), name='hall-image-create'),
     path('halls/images/<int:pk>/manage/', HallImageManageApiView.as_view(), name='hall-image-manage'),
@@ -65,12 +65,4 @@ urlpatterns = [
     path('showtimes/<int:pk>/manage/', ShowtimeManageApiView.as_view(), name='showtime-manage'),
     path('showtime-seats/<int:pk>/status/', ShowtimeSeatStatusUpdateApiView.as_view(), name='showtime-seat-status'),
     path('movies/active-showtimes/', ActiveMovieShowTimeListApiView.as_view(), name='active-movie-showtimes'),
-    path('branches/<int:branch_id>/admins/', BranchAdminListApiView.as_view(), name='branch-admin-list'),
-    path('branches/<int:branch_id>/admins/register/', BranchAdminRegisterApiView.as_view(), name='branch-admin-register'),
-    path('branches/<int:branch_id>/admins/<int:staff_id>/', BranchAdminRemoveApiView.as_view(), name='branch-admin-remove'),
-    path('branches/<int:branch_id>/halls/', BranchHallListCreateApiView.as_view(), name='branch-hall-list-create'),
-    path('halls/<int:hall_id>/', HallDetailApiView.as_view(), name='hall-detail'),
-
-
-
 ]
