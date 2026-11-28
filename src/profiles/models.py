@@ -3,14 +3,18 @@ from django.conf import settings
 from cinemas.models import Cinema
 
 class Manager(models.Model):
+    """Profile for a cinema manager, storing payout banking information."""
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='manager_profile')
       
     bank_iban = models.CharField(max_length=24, null=True, blank=True)
 
     def __str__(self):
-        return f"Manager: {self.user.username} - {self.cinema.name}"
+        cinema = getattr(self, 'cinema', None)
+        cinema_name = cinema.name if cinema else 'No Cinema'
+        return f'Manager: {self.user.username} - {cinema_name}'
 
 class Staff(models.Model):
+    """Profile for a cinema staff member scoped to a specific Cinema tenant."""
     SHIFT_CHOICES = (
         ('MORNING', 'Morning Shift'),
         ('EVENING', 'Evening Shift'),
@@ -28,6 +32,7 @@ class Staff(models.Model):
         return f"Staff: {self.user.username} - {self.cinema.name}"
 
 class Customer(models.Model):
+    """Profile for an end-user customer with personal details and loyalty points."""
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='customer_profile')
     loyalty_points = models.PositiveIntegerField(default=0)
     firstname = models.CharField(max_length=255)
