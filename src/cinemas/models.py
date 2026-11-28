@@ -4,8 +4,8 @@ from django.core.validators import FileExtensionValidator
 
 
 class Cinema(TenantMixin):
-    
-        
+    """Multi-tenant Cinema model representing an isolated PostgreSQL schema."""
+
     name = models.CharField(max_length=100, unique=True)
     
     
@@ -28,11 +28,13 @@ class Cinema(TenantMixin):
 
 
 class CinemaDomain(DomainMixin):
-    """آدرس دامنه یا ساب‌دامین اختصاصی هر سینما"""
+    """Domain mapping table routing incoming HTTP hosts to their Cinema tenant."""
+
     pass
 
 
 class Movie(models.Model):
+    """Shared movie catalog entry available across cinema tenants."""
     class GenreChoices(models.TextChoices):
             ACTION = 'ACTION', 'اکشن'
             DRAMA = 'DRAMA', 'درام'
@@ -67,7 +69,7 @@ class Movie(models.Model):
 
 
 class MovieImage(models.Model):
-    """گالری تصاویر فیلم"""
+    """Gallery image attached to a Movie."""
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='gallery_images')
     image = models.ImageField(upload_to='movies/gallery/')
     caption = models.CharField(max_length=255, null=True, blank=True)

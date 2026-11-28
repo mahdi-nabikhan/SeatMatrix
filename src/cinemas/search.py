@@ -16,6 +16,7 @@ MOVIES_INDEX = os.getenv('ELASTICSEARCH_MOVIES_INDEX', 'movies')
 
 
 def _get_showing_movie_ids(schema_name: str) -> set[int]:
+    """Return movie IDs that have at least one upcoming showtime in the active tenant."""
     if schema_name == 'public':
         return set()
     return set(
@@ -27,6 +28,7 @@ def _get_showing_movie_ids(schema_name: str) -> set[int]:
 
 def _search_db(*, query: str, genre: str | None, min_duration: int | None,
                max_duration: int | None, only_showing: bool, schema_name: str) -> list[Movie]:
+    """Execute a fallback PostgreSQL search over active movies."""
     qs = Movie.objects.filter(is_active=True).select_related('created_by_cinema')
 
     if query:
@@ -46,6 +48,7 @@ def _search_db(*, query: str, genre: str | None, min_duration: int | None,
 
 def _search_es(*, query: str, genre: str | None, min_duration: int | None,
                max_duration: int | None, only_showing: bool, schema_name: str) -> list[int]:
+    """Query Elasticsearch and return ordered matching movie IDs."""
     must = []
     filters = [{'term': {'is_active': True}}]
 
@@ -99,6 +102,20 @@ def _search_es(*, query: str, genre: str | None, min_duration: int | None,
 def search_movies(*, query: str = '', genre: str | None = None,
                   min_duration: int | None = None, max_duration: int | None = None,
                   only_showing: bool = False, schema_name: str = 'public') -> dict:
+    """Search active movies via Elasticsearch with automatic database fallback.
+
+    Args:
+        query: Free-text search query matched against title and description.
+        genre: Optional exact genre code filter.
+        min_duration: Optional minimum runtime in minutes.
+        max_duration: Optional maximum runtime in minutes.
+        only_showing: If True, restricts matches to movies with upcoming showtimes.
+        schema_name: Active tenant schema name for showtime resolution.
+
+    Returns:
+        A dict containing `engine` (`"elasticsearch"` or `"database"`) and
+        the ordered list of `Movie` instances under `movies`.
+    """
     try:
         movie_ids = _search_es(
             query=query,
@@ -125,6 +142,7 @@ def search_movies(*, query: str = '', genre: str | None = None,
     
     
 def ensure_movies_index() -> None:
+    """Create the Elasticsearch movies index with explicit mappings if it does not exist."""
     mapping = {
         'mappings': {
             'properties': {
@@ -151,6 +169,7 @@ def ensure_movies_index() -> None:
 
 
 def index_movie(movie: Movie) -> None:
+    """Upsert a single Movie document into the Elasticsearch index."""
     doc = {
         'title': movie.title,
         'description': movie.description or '',
@@ -169,9 +188,26 @@ def index_movie(movie: Movie) -> None:
 
 
 def reindex_all_movies() -> int:
+    """Ensure the movies index exists and reindex every Movie record from PostgreSQL."""
     ensure_movies_index()
     count = 0
     for movie in Movie.objects.all():
         index_movie(movie)
         count += 1
     return count
+
+
+
+
+def delete_movie_from_index(movie_id: int) -> None:
+    """Remove a Movie document from the Elasticsearch index, ignoring 404 responses."""
+    req = urllib.request.Request(
+        f'{ELASTICSEARCH_URL}/{MOVIES_INDEX}/_doc/{movie_id}?refresh=true',
+        method='DELETE',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5):
+            pass
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise

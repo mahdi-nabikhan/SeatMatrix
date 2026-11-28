@@ -3,6 +3,7 @@ import logging
 import re
 import urllib.error
 import urllib.request
+
 from django.conf import settings
 from django.utils import timezone
 
@@ -23,6 +24,7 @@ GENRE_KEYWORDS = {
 
 
 def _collect_cinema_context(*, schema_name: str, max_movies: int = 25) -> tuple[list[Movie], set[int]]:
+    """Load recent active movies and the set of movie IDs with upcoming showtimes."""
     movies = list(
         Movie.objects.filter(is_active=True)
         .select_related('created_by_cinema')
@@ -42,6 +44,7 @@ def _collect_cinema_context(*, schema_name: str, max_movies: int = 25) -> tuple[
 
 
 def _build_llm_messages(*, prompt: str, movies: list[Movie], upcoming_ids: set[int], limit: int) -> list[dict]:
+    """Construct system and user chat messages grounded strictly in the movie catalog."""
     catalog = [
         {
             'id': m.id,
@@ -71,6 +74,7 @@ def _build_llm_messages(*, prompt: str, movies: list[Movie], upcoming_ids: set[i
 
 
 def _extract_json_object(text: str) -> dict:
+    """Extract and parse the first JSON object embedded in a raw LLM text response."""
     cleaned = text.strip()
     match = re.search(r'\{.*\}', cleaned, re.DOTALL)
     if not match:
@@ -79,6 +83,7 @@ def _extract_json_object(text: str) -> dict:
 
 
 def _call_openai_compatible_api(messages: list[dict]) -> dict:
+    """Send a chat completion request to the configured OpenAI-compatible endpoint."""
     base_url = settings.AI_BASE_URL.rstrip('/')
     endpoint = f'{base_url}/chat/completions'
 
@@ -105,7 +110,14 @@ def _call_openai_compatible_api(messages: list[dict]) -> dict:
     return _extract_json_object(content)
 
 
-def _fallback_recommend(*, prompt: str, movies: list[Movie], upcoming_ids: set[int], limit: int) -> tuple[str, list[Movie]]:
+def _fallback_recommend(
+    *,
+    prompt: str,
+    movies: list[Movie],
+    upcoming_ids: set[int],
+    limit: int,
+) -> tuple[str, list[Movie]]:
+    """Score movies locally by genre keywords, title match, and upcoming showtimes."""
     lowered = prompt.lower()
     matched_genres = {
         genre
@@ -136,6 +148,16 @@ def _fallback_recommend(*, prompt: str, movies: list[Movie], upcoming_ids: set[i
 
 
 def ask_movie_assistant(*, prompt: str, schema_name: str, limit: int = 3) -> dict:
+    """Recommend movies for a user prompt via LLM with local keyword-based fallback.
+
+    Args:
+        prompt: Natural-language user request describing preferred movie traits.
+        schema_name: Active tenant schema used to prioritize currently showing films.
+        limit: Maximum number of movies to recommend.
+
+    Returns:
+        A dict containing `provider` (`"llm"` or `"fallback"`), `answer`, and `movies`.
+    """
     movies, upcoming_ids = _collect_cinema_context(schema_name=schema_name)
     if not movies:
         return {

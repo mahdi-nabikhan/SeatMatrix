@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from cinemas.models import Cinema
 from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import ProtectedError
 from cinemas.recommendations import get_recommended_movies
 from rest_framework.views import APIView
 from django.db import connection
@@ -19,12 +20,14 @@ from cinemas.cache import (
 from cinemas.ai_service import ask_movie_assistant
 
 class CinemaRegisterApiView(generics.CreateAPIView):
+    """Register a new Cinema tenant along with its Manager account."""
     serializer_class = CinemaRegisterSerializer
     permission_classes = [permissions.AllowAny]
 
     
     
 class CinemaListApiView(generics.ListAPIView):
+    """List all registered cinemas."""
     serializer_class = CinemaListSerializer
     queryset = Cinema.objects.all()
     permission_classes = [permissions.AllowAny]
@@ -33,6 +36,7 @@ class CinemaListApiView(generics.ListAPIView):
     
     
 class CinemaDetailApiView(generics.RetrieveAPIView):
+    """Retrieve full details of a single cinema by primary key."""
     permission_classes = [permissions.AllowAny]
     queryset = Cinema.objects.all()
     serializer_class = CinemaDetailSerializer
@@ -40,16 +44,19 @@ class CinemaDetailApiView(generics.RetrieveAPIView):
     
     
 class CinemaUpdateApiview(generics.GenericAPIView):
+    """Update a cinema's profile details via PUT or PATCH."""
     permission_classes = [permissions.AllowAny]
     queryset = Cinema.objects.all()
     serializer_class = CinemaUpdateSerializer
     
     
     def get_object(self,pk):
+        """Return the Cinema matching `pk` or raise 404."""
         return get_object_or_404(Cinema,pk=pk)
     
     
     def put(self,request,pk):
+        """Perform a full update of the target cinema."""
         obj = self.get_object(pk)
         serializer = self.get_serializer(instance=obj,data=request.data,context={'request':request})
         serializer.is_valid(raise_exception=True)
@@ -57,6 +64,7 @@ class CinemaUpdateApiview(generics.GenericAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self,request,pk):
+        """Perform a partial update of the target cinema."""
         obj = self.get_object(pk)
         serializer = self.get_serializer(instance=obj,data=request.data,context={'request':request},partial=True)
         serializer.is_valid(raise_exception=True)
@@ -65,14 +73,17 @@ class CinemaUpdateApiview(generics.GenericAPIView):
         
         
 class CinemaDeleteApiView(generics.GenericAPIView):
+    """Delete the cinema owned by the authenticated manager."""
     model = Cinema
     permission_classes = [permissions.IsAuthenticated]
     
     
     def get_object(self):
+        """Return the Cinema managed by `request.user` or raise 404."""
         return get_object_or_404(self.model,manager__user=self.request.user)
     
     def delete(self, request, *args, **kwargs):
+        """Delete the manager's cinema and return 204 No Content."""
         cinema = self.get_object()
         cinema.delete()
         return Response(
@@ -85,6 +96,10 @@ class CinemaDeleteApiView(generics.GenericAPIView):
 
 
 class MovieRegisterApiview(generics.GenericAPIView):
+    """Create a new movie scoped to the active cinema tenant.
+
+    Restricted to authenticated cinema managers or authorized staff.
+    """
     serializer_class = RegisterMovieSerializer
     permission_classes = [permissions.IsAuthenticated,IsCinemaManagerOrStaffForMovie]
     queryset = Movie.objects.all()
@@ -92,6 +107,7 @@ class MovieRegisterApiview(generics.GenericAPIView):
     
     
     def post(self,request):
+        """Validate payload and persist the new movie."""
         serializer = self.get_serializer(data=request.data,context={'request':request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -99,10 +115,13 @@ class MovieRegisterApiview(generics.GenericAPIView):
     
     
 class MovieListApiView(generics.ListAPIView):
+    """List active movies with versioned response caching (`X-Cache: HIT|MISS`)."""
     serializer_class = MovieListSerializer
     queryset = Movie.objects.filter(is_active=True).select_related('created_by_cinema')
     permission_classes = [permissions.AllowAny]
+    
     def list(self, request, *args, **kwargs):
+        """Return cached movie list when available, otherwise query DB and populate cache."""
         host = request.get_host()
         full_path = request.get_full_path()
 
@@ -120,11 +139,13 @@ class MovieListApiView(generics.ListAPIView):
 
 
 class MovieDetailApiview(generics.RetrieveAPIView):
+    """Retrieve a single movie with gallery images and versioned response caching."""
     serializer_class = MovieDetailSerializer
     queryset = Movie.objects.select_related('created_by_cinema').prefetch_related('gallery_images')
     permission_classes = [permissions.AllowAny]
     
     def retrieve(self, request, *args, **kwargs):
+        """Return cached movie detail when available, otherwise query DB and populate cache."""
         movie_id = int(kwargs['pk'])
         host = request.get_host()
 
@@ -143,6 +164,7 @@ class MovieDetailApiview(generics.RetrieveAPIView):
     
     
 class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
+    """Update or delete a movie (soft-deactivating if referenced by protected relations)."""
     serializer_class = UpdateMovieSerializer
     permission_classes =[permissions.IsAuthenticated,IsCinemaManagerOrStaffForMovie]
     queryset = Movie.objects.all()
@@ -151,6 +173,7 @@ class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
     
     
     def put(self,request,pk):
+        """Perform a full update on the target movie."""
         obj = self.get_object()
         serializer= self.get_serializer(data=request.data,instance=obj,context={'request':request})
         serializer.is_valid(raise_exception=True)
@@ -159,6 +182,7 @@ class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
     
     
     def patch(self,request,pk):
+        """Perform a partial update on the target movie."""
         obj = self.get_object()
         serializer= self.get_serializer(data=request.data,instance=obj,context={'request':request},partial=True)
         serializer.is_valid(raise_exception=True)
@@ -166,6 +190,7 @@ class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
         return Response({'detail':'فیلم با موفقیت بروز رسانی شد'},status=status.HTTP_200_OK)
         
     def delete(self, request, pk):
+        """Delete the movie or fall back to setting `is_active=False` on ProtectedError."""
         obj = self.get_object()
         try:
             obj.delete()
@@ -183,6 +208,7 @@ class MovieUpdateAndDeleteApiView(generics.GenericAPIView):
 
 
 class ActiveMovieShowTimeListApiView(generics.ListAPIView):
+    """List active movies available for showtimes."""
     serializer_class = MovieListSerializer
     permission_classes = [permissions.AllowAny]
     
@@ -195,6 +221,7 @@ class ActiveMovieShowTimeListApiView(generics.ListAPIView):
 
 
 class RecommendedMovieListApiView(APIView):
+    """Return personalized or popular movie recommendations for the active tenant."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
@@ -236,10 +263,11 @@ class RecommendedMovieListApiView(APIView):
     
     
 class AIMovieAssistantApiView(APIView):
-
+    """Answer natural-language movie discovery prompts using an LLM with local fallback."""
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        """Validate the user prompt and return an AI-generated answer with matching movies."""
         serializer = AIMovieAssistantRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -269,9 +297,11 @@ class AIMovieAssistantApiView(APIView):
         
         
 class MovieSearchApiView(APIView):
+    """Search active movies via Elasticsearch with automatic PostgreSQL fallback."""
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        """Parse query/filter parameters and return matching movies with engine metadata."""
         query = request.query_params.get('q', '').strip()
         genre = request.query_params.get('genre') or None
         min_duration_raw = request.query_params.get('min_duration')
