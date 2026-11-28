@@ -8,6 +8,7 @@ from cinemas.recommendations import get_recommended_movies
 from rest_framework.views import APIView
 from django.db import connection
 from cinemas.api.v1.serializers import *
+from cinemas.search import search_movies
 from .permissions import *
 from cinemas.cache import (
     get_cached_movie_detail,
@@ -260,6 +261,54 @@ class AIMovieAssistantApiView(APIView):
                 'answer': result['answer'],
                 'count': len(movies_data),
                 'recommended_movies': movies_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+        
+        
+        
+        
+class MovieSearchApiView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        query = request.query_params.get('q', '').strip()
+        genre = request.query_params.get('genre') or None
+        min_duration_raw = request.query_params.get('min_duration')
+        max_duration_raw = request.query_params.get('max_duration')
+        only_showing = request.query_params.get('only_showing', 'false').lower() in ('true', '1', 'yes')
+
+        try:
+            min_duration = int(min_duration_raw) if min_duration_raw is not None else None
+            max_duration = int(max_duration_raw) if max_duration_raw is not None else None
+        except ValueError:
+            return Response(
+                {'detail': 'مقادیر min_duration و max_duration باید عدد صحیح باشند.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = search_movies(
+            query=query,
+            genre=genre,
+            min_duration=min_duration,
+            max_duration=max_duration,
+            only_showing=only_showing,
+            schema_name=connection.schema_name,
+        )
+
+        if isinstance(result, dict):
+            movies = result.get('movies', [])
+            engine = result.get('engine', 'elasticsearch')
+        else:
+            movies = result
+            engine = 'elasticsearch'
+
+        serializer = MovieListSerializer(movies, many=True, context={'request': request})
+        return Response(
+            {
+                'engine': engine,
+                'count': len(serializer.data),
+                'results': serializer.data,
             },
             status=status.HTTP_200_OK,
         )

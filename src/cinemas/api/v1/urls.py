@@ -24,6 +24,7 @@ urlpatterns = [
     path('movies/<int:pk>/', views.MovieDetailApiview.as_view(), name='movie-detail'),
     path('movies/<int:pk>/manage/', views.MovieUpdateAndDeleteApiView.as_view(), name='movie-update-delete'),
     path('movies/ai-assistant/', views.AIMovieAssistantApiView.as_view(), name='movie-ai-assistant'),
+    path('movies/search/', views.MovieSearchApiView.as_view(), name='movie-search'),
     
     
 ]
