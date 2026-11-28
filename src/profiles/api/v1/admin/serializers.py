@@ -3,6 +3,7 @@ from profiles.models import Staff
 
 
 class StaffSerializer(serializers.ModelSerializer):
+    """Serialize staff shift/status along with read-only user contact fields."""
     email = serializers.EmailField(source='user.email', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     phone_number = serializers.CharField(source='user.phone_number', read_only=True)

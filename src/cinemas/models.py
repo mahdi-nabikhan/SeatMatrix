@@ -4,7 +4,11 @@ from django.core.validators import FileExtensionValidator
 
 
 class Cinema(TenantMixin):
+    """Multi-tenant Cinema model representing an isolated PostgreSQL schema."""
+
     name = models.CharField(max_length=100, unique=True)
+    
+    
     description = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     manager = models.OneToOneField(
@@ -24,16 +28,30 @@ class Cinema(TenantMixin):
 
 
 class CinemaDomain(DomainMixin):
-    """آدرس دامنه یا ساب‌دامین اختصاصی هر سینما"""
+    """Domain mapping table routing incoming HTTP hosts to their Cinema tenant."""
+
     pass
 
 
 class Movie(models.Model):
-    """فیلم‌ها عمومی هستند و بین همه سینماها مشترکند"""
+    """Shared movie catalog entry available across cinema tenants."""
+    class GenreChoices(models.TextChoices):
+            ACTION = 'ACTION', 'اکشن'
+            DRAMA = 'DRAMA', 'درام'
+            COMEDY = 'COMEDY', 'کمدی'
+            SCI_FI = 'SCI_FI', 'علمی‌تخیلی'
+            THRILLER = 'THRILLER', 'هیجان‌انگیز'
+            HORROR = 'HORROR', 'ترسناک'
+            ANIMATION = 'ANIMATION', 'انیمیشن'
+            OTHER = 'OTHER', 'سایر'
+            
+
     title = models.CharField(max_length=200)
     description = models.TextField()
+    genre = models.CharField(max_length=20,choices=GenreChoices.choices,default=GenreChoices.OTHER,db_index=True,)
     duration_minutes = models.PositiveIntegerField()
     poster = models.ImageField(upload_to='movies/posters/', null=True, blank=True)
+    
     trailer = models.FileField(
         upload_to='movies/trailers/',
         null=True,
@@ -51,7 +69,7 @@ class Movie(models.Model):
 
 
 class MovieImage(models.Model):
-    """گالری تصاویر فیلم"""
+    """Gallery image attached to a Movie."""
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='gallery_images')
     image = models.ImageField(upload_to='movies/gallery/')
     caption = models.CharField(max_length=255, null=True, blank=True)

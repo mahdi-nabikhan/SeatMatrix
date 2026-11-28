@@ -14,11 +14,17 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 User = get_user_model()
 
 class UserRegistrationApiView(generics.GenericAPIView):
+    """Register a new user account.
+
+    Accepts `username`, `email`, `password`, `confirm_password`, and `phone_number`.
+    Publicly accessible (`AllowAny`).
+    """
     serializer_class = UserRegistrations
     permission_classes = [permissions.AllowAny]
     queryset = User.objects.all()
 
     def post(self, request, *args, **kwargs):
+        """Validate input and create a new user account."""
         serializer = self.get_serializer(data=request.data)
        
         serializer.is_valid(raise_exception=True) 
@@ -35,11 +41,18 @@ class UserRegistrationApiView(generics.GenericAPIView):
         
         
 class EmailJwtLoginApiView (TokenObtainPairView):
+    """Authenticate a user via email and password and issue HttpOnly JWT cookies.
+
+    Sets `access_token` and `refresh_token` cookies scoped to `COOKIE_DOMAIN`
+    and returns `user_id` along with a role-based `redirect_url` (`manager`,
+    `staff`, `customer`, or `None`).
+    """
     serializer_class = EmailJWTLoginSerializers
     permission_classes = [permissions.AllowAny]
     
     
     def post(self, request, *args, **kwargs):
+        """Authenticate credentials, resolve user role, and attach JWT cookies."""
         redirect_url = None
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -89,11 +102,17 @@ class EmailJwtLoginApiView (TokenObtainPairView):
 
 
 class UsernameJwtLoginAPIview(generics.GenericAPIView):
+    """Authenticate a user via username and password and issue HttpOnly JWT cookies.
+
+    Sets `access_token` and `refresh_token` cookies scoped to `COOKIE_DOMAIN`
+    and returns `user_id` along with a role-based `redirect_url`.
+    """
     serializer_class = UsernameJwtLoginSerializers
     permission_classes = [permissions.AllowAny]
     
     
     def post(self,request,*args,**kwargs):
+        """Authenticate credentials, resolve user role, and attach JWT cookies."""
         redirect_url = None
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -150,18 +169,21 @@ class UsernameJwtLoginAPIview(generics.GenericAPIView):
         
         
 class CheckUserLoginApiview(generics.GenericAPIView):
+    """Return the authenticated user's username to verify active session state."""
     
     def get(self,request):
+        """Return the current authenticated user's username."""
         return Response({'detail':request.user.username})
     
     
     
     
 class LogoutApiView(generics.GenericAPIView):
+    """Log out an authenticated user by clearing JWT access and refresh cookies."""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self,request,*args,**kwargs):
-        
+        """Delete JWT cookies from the client browser and return confirmation."""
         response = Response({'detail': 'با موفقیت خارج شدید.'}, status=status.HTTP_200_OK)
         simple_jwt_settings = getattr(settings,'SIMPLE_JWT', {})
         response.delete_cookie(
@@ -185,10 +207,11 @@ class LogoutApiView(generics.GenericAPIView):
     
     
 class CookieTokenRefreshApiView(TokenRefreshView):
+    """Refresh JWT tokens using the HttpOnly refresh cookie and rotate response cookies."""
     serializer_class = CookieTokenRefreshSerializer
     
     def post(self, request, *args, **kwargs):
-
+        """Validate refresh cookie and issue updated access (and optional refresh) cookies."""
         serializer = self.get_serializer(data=request.data)
         
         try:
@@ -238,11 +261,13 @@ class CookieTokenRefreshApiView(TokenRefreshView):
 
 
 class RequestOTPApiView(generics.GenericAPIView):
+    """Generate and dispatch a 6-digit login OTP for a registered phone number."""
     serializer_class = RequestOTPSerializer
     permission_classes = [permissions.AllowAny]
     
     
     def post(self,request,*args,**kwargs):
+        """Create an OTP code for the requested phone number and log it for delivery."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         otp_obj = serializer.validated_data['otp_obj']
@@ -258,11 +283,13 @@ class RequestOTPApiView(generics.GenericAPIView):
 
 
 class VerifyOTPLoginApiView(generics.GenericAPIView):
+    """Verify a phone OTP code and authenticate the user with HttpOnly JWT cookies."""
     serializer_class = VerifyOTPLoginSerializer
     permission_classes = [permissions.AllowAny]
     
     
     def post(self,request,*args,**kwargs):
+        """Validate the OTP, resolve user role, and attach JWT cookies to the response."""
         redirect_url = None
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

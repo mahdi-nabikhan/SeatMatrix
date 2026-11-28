@@ -8,6 +8,7 @@ from promotions.models import Coupon, DiscountRule
 
 
 def _calc_percentage_discount(total_amount: Decimal,percentage: int,max_amount: Decimal | None = None) ->Decimal:
+    """Compute an integer-floored percentage discount capped by `max_amount` and `total_amount`."""
     discount = (Decimal(total_amount) * Decimal(percentage)) // Decimal(100)
     if max_amount is not None:
         discount =  min(discount,Decimal(max_amount))
@@ -16,6 +17,19 @@ def _calc_percentage_discount(total_amount: Decimal,percentage: int,max_amount: 
 
 
 def validate_coupon (code:str,*,lock:bool = False) -> Coupon:
+    """Validate a coupon code's active state, validity dates, and remaining capacity.
+
+    Args:
+        code: Case-insensitive coupon code string.
+        lock: When True, acquires a row-level `SELECT FOR UPDATE` lock for atomic consumption.
+
+    Returns:
+        The validated `Coupon` instance.
+
+    Raises:
+        ValidationError: If the coupon does not exist, is inactive, outside its
+            validity window, or has reached its usage capacity.
+    """
     cleaned_code = code.strip()
     qs = Coupon.objects.select_for_update() if lock else Coupon.objects.all()
     
@@ -39,6 +53,7 @@ def validate_coupon (code:str,*,lock:bool = False) -> Coupon:
  
  
 def get_active_discount_rule(showtime_start_time) -> DiscountRule | None:
+    """Return the highest-percentage active DiscountRule matching the showtime's local weekday."""
 
     local_weekday = timezone.localtime(showtime_start_time).weekday()
     return (
@@ -51,7 +66,18 @@ def get_active_discount_rule(showtime_start_time) -> DiscountRule | None:
 
 
 def apply_promotions(*,total_amount: Decimal,showtime_start_time,coupon_code: str | None = None,consume: bool = False) -> dict:
+    """Evaluate applicable weekday rules and optional coupon, applying whichever saves more.
 
+    Args:
+        total_amount: Gross order amount before discounts.
+        showtime_start_time: Aware datetime of the showtime used for weekday rule matching.
+        coupon_code: Optional user-supplied coupon code.
+        consume: If True and the coupon is selected, atomically increments `used_count`.
+
+    Returns:
+        A dict containing `discount_amount`, `final_amount`, `applied_type`,
+        `applied_name`, and the applied `coupon` instance (or None).
+    """
     total_amount = Decimal(total_amount)
 
     rule = get_active_discount_rule(showtime_start_time)

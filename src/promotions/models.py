@@ -2,9 +2,7 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Coupon(models.Model):
-    """
-    کدهای تخفیف دستی که کاربر در سبد خرید وارد می‌کند.
-    """
+    """Tenant-scoped promotional coupon with optional cap, usage limit, and validity window."""
     code = models.CharField(max_length=50, unique=True, help_text="کد تخفیف (مثلا: YALDA)")
     discount_percentage = models.PositiveIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(100)],
@@ -26,10 +24,7 @@ class Coupon(models.Model):
 
 
 class DiscountRule(models.Model):
-    """
-    قوانین تخفیف خودکار (بدون نیاز به کد)
-    مثال: سه‌شنبه‌های نیم‌بها
-    """
+    """Automatic tenant-scoped percentage discount rule optionally tied to a weekday."""
     name = models.CharField(max_length=100, help_text="عنوان (مثلا: سه‌شنبه‌های نیم‌بها)")
     discount_percentage = models.PositiveIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(100)]

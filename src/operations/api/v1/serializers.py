@@ -1,140 +1,155 @@
+from django.contrib.auth import get_user_model
 from django.db import transaction
-from rest_framework.exceptions import PermissionDenied
-from rest_framework import serializers
-from operations.models import Seat, Address, CinemaBranch, CinemaBranchImage,Hall,HallImage,Showtime, ShowtimeSeat
-from .permissions import is_tenant_manager, is_tenant_staff
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
+
 from cinemas.models import Movie
-from django.contrib.auth import get_user_model
+from operations.models import (
+    Address,
+    CinemaBranch,
+    CinemaBranchImage,
+    Hall,
+    HallImage,
+    Seat,
+    Showtime,
+    ShowtimeSeat,
+)
 from profiles.models import Staff
+
+from .permissions import is_tenant_manager, is_tenant_staff
+
 User = get_user_model()
 
 
+def _is_branch_admin(user, tenant, branch: CinemaBranch) -> bool:
+    """Return True if the user is an active staff member assigned to manage `branch`."""
+    return (
+        is_tenant_staff(user, tenant)
+        and branch.branch_admins.filter(user=user, is_active=True).exists()
+    )
+
+
 class CinemaAddressSerializer(serializers.ModelSerializer):
+    """Serialize physical address fields for a CinemaBranch."""
+
     class Meta:
         model = Address
         fields = '__all__'
-        
-        
+
 
 class CinemaBranchImageListSerializer(serializers.ModelSerializer):
+    """Serialize gallery image entries attached to a CinemaBranch."""
+
     class Meta:
         model = CinemaBranchImage
         fields = ['id', 'image', 'caption', 'uploaded_at']
-        
-        
 
 
 class CinemasBranchRegisterSerializer(serializers.ModelSerializer):
+    """Atomically create an Address and its associated CinemaBranch."""
+
     address = CinemaAddressSerializer()
+
     class Meta:
         model = CinemaBranch
         fields = '__all__'
-        read_only_fields = ['id','is_active']
-        
-        
-        
+        read_only_fields = ['id', 'is_active']
+
     @transaction.atomic
     def create(self, validated_data):
-        address_data= validated_data.pop('address')
-        branch_admins = validated_data.pop('branch_admins',[])
+        """Create the nested Address, persist the CinemaBranch, and assign branch admins."""
+        address_data = validated_data.pop('address')
+        branch_admins = validated_data.pop('branch_admins', [])
         address = Address.objects.create(**address_data)
-        
-        branch = CinemaBranch.objects.create(address =address , **validated_data)
+
+        branch = CinemaBranch.objects.create(address=address, **validated_data)
         if branch_admins:
             branch.branch_admins.set(branch_admins)
         return branch
-             
-             
-             
+
+
 class CinemaBranchDetailSerializers(serializers.ModelSerializer):
+    """Serialize complete CinemaBranch details including address and gallery images."""
+
     address = CinemaAddressSerializer(read_only=True)
     gallery_images = CinemaBranchImageListSerializer(many=True, read_only=True)
 
     class Meta:
         model = CinemaBranch
         fields = '__all__'
-        
-        
-        
-
 
 
 class CinemaBranchUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to mutable CinemaBranch fields."""
+
     class Meta:
         model = CinemaBranch
         fields = ['phone_number', 'branch_name', 'facilities', 'cover_image', 'is_active', 'branch_admins']
-        
-        
-
-
 
 
 class CinemaBranchImageCreateSerializer(serializers.ModelSerializer):
+    """Validate and upload a branch gallery image (max 10 images per branch)."""
+
     class Meta:
         model = CinemaBranchImage
         fields = ['id', 'branch', 'image', 'caption', 'uploaded_at']
         read_only_fields = ['id', 'uploaded_at']
 
     def validate_branch(self, branch):
+        """Verify manager/branch-admin access and enforce the 10-image gallery limit."""
         request = self.context['request']
         user = request.user
         tenant = request.tenant
 
-       
-        is_manager = is_tenant_manager(user, tenant)
-        is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and branch.branch_admins.filter(id=user.id).exists()
-        )
-
-        if not (is_manager or is_branch_admin):
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, branch)):
             raise serializers.ValidationError('شما اجازه افزودن تصویر به این شعبه را ندارید.')
 
         if branch.gallery_images.count() >= 10:
             raise serializers.ValidationError('حداکثر ۱۰ تصویر برای هر شعبه مجاز است.')
 
         return branch
-    
-    
-    
+
+
 class CinemaBranchImageUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to an existing CinemaBranchImage."""
+
     class Meta:
         model = CinemaBranchImage
         fields = ['id', 'image', 'caption', 'uploaded_at']
         read_only_fields = ['id', 'uploaded_at']
-        
-        
-        
-        
+
+
 class CinemaBranchListSerializer(serializers.ModelSerializer):
+    """Expose compact branch summary fields with city and province from its address."""
+
     city = serializers.CharField(source='address.city', read_only=True)
     province = serializers.CharField(source='address.province', read_only=True)
 
     class Meta:
         model = CinemaBranch
         fields = ['id', 'branch_name', 'cover_image', 'phone_number', 'city', 'province', 'is_active']
-        
-        
-        
-        
+
+
 class HallImageListSerializer(serializers.ModelSerializer):
+    """Serialize gallery image entries attached to a Hall."""
+
     class Meta:
         model = HallImage
         fields = ['id', 'image', 'caption', 'uploaded_at']
-        
-        
-        
-        
+
 
 class HallRegisterSerializer(serializers.ModelSerializer):
+    """Create a Hall under a branch resolved from URL context `pk`."""
+
     class Meta:
         model = Hall
         fields = '__all__'
         read_only_fields = ['id', 'branch', 'is_active']
 
     def create(self, validated_data):
+        """Verify branch-level write permission and bind the new Hall to the branch."""
         branch_pk = self.context['pk']
         branch = get_object_or_404(CinemaBranch, pk=branch_pk)
 
@@ -142,28 +157,26 @@ class HallRegisterSerializer(serializers.ModelSerializer):
         user = request.user
         tenant = request.tenant
 
-        is_manager = is_tenant_manager(user, tenant)
-        is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and branch.branch_admins.filter(id=user.id).exists()
-        )
-        if not (is_manager or is_branch_admin):
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, branch)):
             raise PermissionDenied('شما اجازه افزودن سالن به این شعبه را ندارید.')
 
         validated_data['branch'] = branch
         return super().create(validated_data)
-    
-    
-    
+
+
 class HallListSerializer(serializers.ModelSerializer):
+    """Serialize compact Hall records with human-readable hall type labels."""
+
     hall_type_display = serializers.CharField(source='get_hall_type_display', read_only=True)
 
     class Meta:
         model = Hall
         fields = ['id', 'branch', 'name', 'hall_type', 'hall_type_display', 'image', 'capacity', 'is_active']
-        
-        
+
+
 class HallDetailSerializer(serializers.ModelSerializer):
+    """Serialize detailed Hall information including parent branch and gallery images."""
+
     branch = CinemaBranchListSerializer(read_only=True)
     gallery_images = HallImageListSerializer(many=True, read_only=True)
     hall_type_display = serializers.CharField(source='get_hall_type_display', read_only=True)
@@ -171,35 +184,31 @@ class HallDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hall
         fields = '__all__'
-        
-        
-        
+
+
 class HallUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to mutable Hall attributes."""
+
     class Meta:
         model = Hall
         fields = ['name', 'hall_type', 'image', 'capacity', 'is_active']
-    
-
 
 
 class HallImageCreateSerializer(serializers.ModelSerializer):
+    """Validate and upload a hall gallery image (max 10 images per hall)."""
+
     class Meta:
         model = HallImage
         fields = ['id', 'hall', 'image', 'caption', 'uploaded_at']
         read_only_fields = ['id', 'uploaded_at']
 
     def validate_hall(self, hall):
+        """Verify manager/branch-admin access and enforce the 10-image gallery limit."""
         request = self.context['request']
         user = request.user
         tenant = request.tenant
 
-        is_manager = is_tenant_manager(user, tenant)
-        is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and hall.branch.branch_admins.filter(id=user.id).exists()
-        )
-
-        if not (is_manager or is_branch_admin):
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, hall.branch)):
             raise serializers.ValidationError('شما اجازه افزودن تصویر به این سالن را ندارید.')
 
         if hall.gallery_images.count() >= 10:
@@ -209,84 +218,77 @@ class HallImageCreateSerializer(serializers.ModelSerializer):
 
 
 class HallImageUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to an existing HallImage."""
+
     class Meta:
         model = HallImage
         fields = ['id', 'image', 'caption', 'uploaded_at']
         read_only_fields = ['id', 'uploaded_at']
-        
-        
-        
-        
 
 
 class SeatSerializer(serializers.ModelSerializer):
-    class Meta :
+    """Validate and serialize individual Hall seats while enforcing hall capacity."""
+
+    class Meta:
         model = Seat
         fields = ['id', 'hall', 'row_label', 'seat_number', 'is_vip']
-        read_only_fileds = ['id']
-        
-        
-        
-    def validate_hall(self,hall):
+        read_only_fields = ['id']
+
+    def validate_hall(self, hall):
+        """Ensure the requesting user can manage seats for the target hall."""
         request = self.context['request']
         user = request.user
         tenant = request.tenant
-            
-            
-        is_manager= is_tenant_manager(user,tenant)
-        is_branch_admin = (
-        is_tenant_staff(user, tenant)
-        and hall.branch.branch_admins.filter(id=user.id).exists())
-        if not (is_manager or is_branch_admin):
+
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, hall.branch)):
             raise serializers.ValidationError('شما اجازه مدیریت صندلی‌های این سالن را ندارید.')
         return hall
-        
+
     def validate(self, attrs):
+        """Reject seat creation if the hall has reached its configured capacity."""
         hall = attrs.get('hall') or getattr(self.instance, 'hall', None)
         if self.instance is None and hall and hall.seats.count() >= hall.capacity:
             raise serializers.ValidationError('ظرفیت صندلی‌های این سالن تکمیل شده است.')
         return attrs
-        
-        
+
+
 class SeatUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to a seat's row label, seat number, or VIP flag."""
+
     class Meta:
         model = Seat
         fields = ['id', 'row_label', 'seat_number', 'is_vip']
         read_only_fields = ['id']
-        
-        
-        
-
 
 
 class SeatBulkCreateSerializer(serializers.Serializer):
-    
-    
+    """Generate a grid of seats across specified rows for a Hall in a single transaction."""
+
     hall = serializers.PrimaryKeyRelatedField(queryset=Hall.objects.select_related('branch'))
-    rows = serializers.ListField(child=serializers.CharField(max_length=5),help_text='مثلاً ["A", "B", "C"]')
+    rows = serializers.ListField(
+        child=serializers.CharField(max_length=5),
+        help_text='مثلاً ["A", "B", "C"]',
+    )
     seats_per_row = serializers.IntegerField(min_value=1)
     vip_rows = serializers.ListField(
         child=serializers.CharField(max_length=5),
         required=False,
         default=list,
-        help_text='ردیف‌هایی که VIP هستند، مثلاً ["A", "B"]'
+        help_text='ردیف‌هایی که VIP هستند، مثلاً ["A", "B"]',
     )
-    
+
     def validate_hall(self, hall):
+        """Ensure the requesting user is authorized to add seats to the target hall."""
         request = self.context['request']
         user = request.user
         tenant = request.tenant
 
-        is_manager = is_tenant_manager(user, tenant)
-        is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and hall.branch.branch_admins.filter(id=user.id).exists()
-        )
-        if not (is_manager or is_branch_admin):
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, hall.branch)):
             raise serializers.ValidationError('شما اجازه افزودن صندلی به این سالن را ندارید.')
         return hall
 
     def validate(self, attrs):
+        """Ensure existing plus newly requested seats do not exceed hall capacity."""
         hall = attrs['hall']
         total_new_seats = len(attrs['rows']) * attrs['seats_per_row']
         if hall.seats.count() + total_new_seats > hall.capacity:
@@ -297,6 +299,7 @@ class SeatBulkCreateSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        """Bulk-insert seats for every (row, seat_number) pair, ignoring duplicates."""
         hall = validated_data['hall']
         rows = validated_data['rows']
         seats_per_row = validated_data['seats_per_row']
@@ -314,13 +317,11 @@ class SeatBulkCreateSerializer(serializers.Serializer):
         ]
 
         return Seat.objects.bulk_create(seats_to_create, ignore_conflicts=True)
-    
-    
-    
-    
 
 
 class ShowtimeSeatSerializer(serializers.ModelSerializer):
+    """Serialize a ShowtimeSeat with seat coordinates, VIP flag, and status display."""
+
     row_label = serializers.CharField(source='seat.row_label', read_only=True)
     seat_number = serializers.IntegerField(source='seat.seat_number', read_only=True)
     is_vip = serializers.BooleanField(source='seat.is_vip', read_only=True)
@@ -332,7 +333,8 @@ class ShowtimeSeatSerializer(serializers.ModelSerializer):
 
 
 class ShowtimeSeatStatusUpdateSerializer(serializers.ModelSerializer):
-    """برای تغییر دستی وضعیت صندلی توسط منیجر یا ادمین شعبه (مثلاً فروش حضوری)"""
+    """Allow managers or branch admins to manually update a ShowtimeSeat's status."""
+
     class Meta:
         model = ShowtimeSeat
         fields = ['id', 'status']
@@ -340,6 +342,8 @@ class ShowtimeSeatStatusUpdateSerializer(serializers.ModelSerializer):
 
 
 class ShowtimeListSerializer(serializers.ModelSerializer):
+    """Serialize summary Showtime entries with movie, hall, and branch names."""
+
     movie_title = serializers.CharField(source='movie.title', read_only=True)
     hall_name = serializers.CharField(source='hall.name', read_only=True)
     branch_name = serializers.CharField(source='hall.branch.branch_name', read_only=True)
@@ -347,12 +351,20 @@ class ShowtimeListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Showtime
         fields = [
-            'id', 'movie', 'movie_title', 'hall', 'hall_name',
-            'branch_name', 'start_time', 'base_price'
+            'id',
+            'movie',
+            'movie_title',
+            'hall',
+            'hall_name',
+            'branch_name',
+            'start_time',
+            'base_price',
         ]
 
 
 class ShowtimeDetailSerializer(serializers.ModelSerializer):
+    """Serialize a Showtime along with its full seat availability map."""
+
     movie_title = serializers.CharField(source='movie.title', read_only=True)
     hall_name = serializers.CharField(source='hall.name', read_only=True)
     branch_name = serializers.CharField(source='hall.branch.branch_name', read_only=True)
@@ -361,28 +373,33 @@ class ShowtimeDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Showtime
         fields = [
-            'id', 'movie', 'movie_title', 'hall', 'hall_name',
-            'branch_name', 'start_time', 'base_price', 'showtime_seats'
+            'id',
+            'movie',
+            'movie_title',
+            'hall',
+            'hall_name',
+            'branch_name',
+            'start_time',
+            'base_price',
+            'showtime_seats',
         ]
 
 
 class ShowtimeCreateSerializer(serializers.ModelSerializer):
+    """Create a future Showtime and auto-populate AVAILABLE ShowtimeSeat rows."""
+
     class Meta:
         model = Showtime
         fields = ['id', 'hall', 'movie', 'start_time', 'base_price']
         read_only_fields = ['id']
 
     def validate_hall(self, hall):
+        """Ensure authorization, active hall status, and at least one configured seat."""
         request = self.context['request']
         user = request.user
         tenant = request.tenant
 
-        is_manager = is_tenant_manager(user, tenant)
-        is_branch_admin = (
-            is_tenant_staff(user, tenant)
-            and hall.branch.branch_admins.filter(id=user.id).exists()
-        )
-        if not (is_manager or is_branch_admin):
+        if not (is_tenant_manager(user, tenant) or _is_branch_admin(user, tenant, hall.branch)):
             raise serializers.ValidationError('شما اجازه ثبت سانس برای این سالن را ندارید.')
 
         if not hall.is_active:
@@ -394,17 +411,20 @@ class ShowtimeCreateSerializer(serializers.ModelSerializer):
         return hall
 
     def validate_movie(self, movie):
+        """Reject showtime creation for inactive movies."""
         if not movie.is_active:
             raise serializers.ValidationError('این فیلم غیرفعال است و امکان ثبت سانس ندارد.')
         return movie
 
     def validate_start_time(self, value):
+        """Ensure showtime start time is strictly in the future."""
         if value <= timezone.now():
             raise serializers.ValidationError('زمان شروع سانس باید در آینده باشد.')
         return value
 
     @transaction.atomic
     def create(self, validated_data):
+        """Persist the Showtime and bulk-create AVAILABLE ShowtimeSeat records for all hall seats."""
         showtime = super().create(validated_data)
 
         seats = showtime.hall.seats.all()
@@ -418,30 +438,29 @@ class ShowtimeCreateSerializer(serializers.ModelSerializer):
 
 
 class ShowtimeUpdateSerializer(serializers.ModelSerializer):
+    """Validate updates to an existing Showtime's movie, start time, or base price."""
+
     class Meta:
         model = Showtime
-
         fields = ['id', 'movie', 'start_time', 'base_price']
         read_only_fields = ['id']
 
     def validate_movie(self, movie):
+        """Reject switching a showtime to an inactive movie."""
         if not movie.is_active:
             raise serializers.ValidationError('این فیلم غیرفعال است.')
         return movie
 
     def validate_start_time(self, value):
+        """Ensure updated start time remains in the future."""
         if value <= timezone.now():
             raise serializers.ValidationError('زمان شروع سانس باید در آینده باشد.')
         return value
-    
-    
-    
-    
-    
-
 
 
 class MovieShowtimeInlineSerializer(serializers.ModelSerializer):
+    """Compact showtime representation nested under currently showing movies."""
+
     hall_name = serializers.CharField(source='hall.name', read_only=True)
     hall_type = serializers.CharField(source='hall.get_hall_type_display', read_only=True)
     branch_name = serializers.CharField(source='hall.branch.branch_name', read_only=True)
@@ -452,62 +471,65 @@ class MovieShowtimeInlineSerializer(serializers.ModelSerializer):
 
 
 class ActiveMovieWithShowtimesSerializer(serializers.ModelSerializer):
+    """Serialize an active Movie along with its upcoming tenant showtimes."""
+
     showtimes = MovieShowtimeInlineSerializer(many=True, read_only=True)
 
     class Meta:
         model = Movie
         fields = ['id', 'title', 'poster', 'duration_minutes', 'showtimes']
-        
-        
-        
-        
 
 
 class BranchAdminRegisterSerializer(serializers.Serializer):
+    """Atomically create a User, bind a Staff profile to the tenant, and assign as branch admin."""
+
     email = serializers.EmailField()
     username = serializers.CharField(max_length=150)
     phone_number = serializers.CharField(max_length=15)
     password = serializers.CharField(write_only=True, min_length=8)
     shift = serializers.ChoiceField(choices=Staff.SHIFT_CHOICES, default='MORNING')
-    
-    
-    
-    def validate_email(self,value):
+
+    def validate_email(self, value):
+        """Ensure the email address is not already registered."""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError('این ایمیل قبلاً ثبت شده است.')
         return value
-    
-    
-    def validate_username(self,value):
+
+    def validate_username(self, value):
+        """Ensure the username is not already taken."""
         if User.objects.filter(username=value).exists():
-           raise serializers.ValidationError('این نام کاربری قبلاً ثبت شده است.')
+            raise serializers.ValidationError('این نام کاربری قبلاً ثبت شده است.')
         return value
-        
+
     def validate_phone_number(self, value):
+        """Ensure the phone number is not already registered."""
         if User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('این شماره موبایل قبلاً ثبت شده است.')
         return value
-    
-    
+
     @transaction.atomic
     def create(self, validated_data):
+        """Create the User and Staff profile and add the staff member to `branch.branch_admins`."""
         branch = self.context['branch']
         tenant = self.context['request'].tenant
-        
-        
-        shift= validated_data.pop('shift')
-        password= validated_data.pop('password')
-        user= User.objects.create_user(password=password,**validated_data)
-        
-        staff = Staff.objects.create(user=user,cinema=tenant,shift=shift,is_active=True,)
+
+        shift = validated_data.pop('shift')
+        password = validated_data.pop('password')
+        user = User.objects.create_user(password=password, **validated_data)
+
+        staff = Staff.objects.create(
+            user=user,
+            cinema=tenant,
+            shift=shift,
+            is_active=True,
+        )
         branch.branch_admins.add(staff)
         return staff
-        
-        
-        
 
 
 class HallSerializer(serializers.ModelSerializer):
+    """Serialize Hall fields for branch-scoped listing, creation, and detail management."""
+
     hall_type_display = serializers.CharField(source='get_hall_type_display', read_only=True)
 
     class Meta:
@@ -523,6 +545,3 @@ class HallSerializer(serializers.ModelSerializer):
             'is_active',
         ]
         read_only_fields = ['id', 'branch', 'hall_type_display']
-        
-        
-  
