@@ -18,11 +18,13 @@ from .serializers import (
 
 
 class CartPromotionPreviewApiView(generics.GenericAPIView):
+    """Preview the best applicable discount for the user's current Redis cart without consuming coupons."""
   
     permission_classes = [permissions.AllowAny]
     serializer_class = PromoPreviewInputSerializer
 
     def post(self, request):
+        """Calculate total, discount, and final payable amount for the active cart."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -54,6 +56,7 @@ class CartPromotionPreviewApiView(generics.GenericAPIView):
 
 
 class CouponListCreateApiView(generics.ListCreateAPIView):
+    """List existing coupons or create a new coupon for the active cinema tenant."""
 
     permission_classes = [IsCinemaManager]
     serializer_class = CouponSerializer
@@ -61,21 +64,21 @@ class CouponListCreateApiView(generics.ListCreateAPIView):
 
 
 class CouponDetailApiView(generics.RetrieveUpdateDestroyAPIView):
-
+    """Retrieve, update, or delete a specific Coupon in the active cinema tenant."""
     permission_classes = [IsCinemaManager]
     serializer_class = CouponSerializer
     queryset = Coupon.objects.all()
 
 
 class DiscountRuleListCreateApiView(generics.ListCreateAPIView):
-  
+    """List existing discount rules or create a new weekday rule for the active tenant."""
     permission_classes = [IsCinemaManager]
     serializer_class = DiscountRuleSerializer
     queryset = DiscountRule.objects.all().order_by('-id')
 
 
 class DiscountRuleDetailApiView(generics.RetrieveUpdateDestroyAPIView):
-
+    """Retrieve, update, or delete a specific DiscountRule in the active cinema tenant."""
     permission_classes = [IsCinemaManager]
     serializer_class = DiscountRuleSerializer
     queryset = DiscountRule.objects.all()

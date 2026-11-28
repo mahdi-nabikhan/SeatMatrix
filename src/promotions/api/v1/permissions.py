@@ -2,8 +2,9 @@ from rest_framework import permissions
 
 
 class IsCinemaManager(permissions.BasePermission):
-
+    """Allow access only to the manager owning the active cinema tenant (or superusers)."""
     def has_permission(self, request, view):
+        """Return True if the authenticated user is a superuser or owns `request.tenant`."""
         user = request.user
         if not user or not user.is_authenticated:
             return False

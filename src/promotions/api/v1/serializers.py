@@ -3,6 +3,7 @@ from promotions.models import Coupon, DiscountRule
 
 
 class PromoPreviewInputSerializer(serializers.Serializer):
+    """Validate optional coupon code input for cart promotion previews."""
     coupon_code = serializers.CharField(
         max_length=50,
         required=False,
@@ -12,6 +13,7 @@ class PromoPreviewInputSerializer(serializers.Serializer):
 
 
 class CouponSerializer(serializers.ModelSerializer):
+    """Serialize and validate Coupon creation and updates with normalized unique codes."""
     class Meta:
         model = Coupon
         fields = [
@@ -28,6 +30,7 @@ class CouponSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'used_count']
 
     def validate_code(self, value: str) -> str:
+        """Normalize coupon code to uppercase and enforce case-insensitive uniqueness."""
         cleaned = value.strip().upper()
         if not cleaned:
             raise serializers.ValidationError('کد تخفیف نمی‌تواند خالی باشد.')
@@ -42,11 +45,13 @@ class CouponSerializer(serializers.ModelSerializer):
         return cleaned
 
     def validate_max_discount_amount(self, value):
+        """Ensure optional max discount cap is strictly positive."""
         if value is not None and value <= 0:
             raise serializers.ValidationError('سقف مبلغ تخفیف باید بیشتر از صفر باشد.')
         return value
 
     def validate(self, attrs):
+        """Ensure `valid_to` is strictly later than `valid_from` when both are provided."""
         valid_from = attrs.get('valid_from', getattr(self.instance, 'valid_from', None))
         valid_to = attrs.get('valid_to', getattr(self.instance, 'valid_to', None))
 
@@ -59,6 +64,7 @@ class CouponSerializer(serializers.ModelSerializer):
 
 
 class DiscountRuleSerializer(serializers.ModelSerializer):
+    """Serialize and validate automatic weekday DiscountRule entries."""
     WEEKDAY_NAMES = {
         0: 'دوشنبه',
         1: 'سه‌شنبه',
@@ -83,11 +89,13 @@ class DiscountRuleSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'day_of_week_display']
 
     def get_day_of_week_display(self, obj) -> str | None:
+        """Return the localized Persian weekday name for `day_of_week`."""
         if obj.day_of_week is None:
             return None
         return self.WEEKDAY_NAMES.get(obj.day_of_week)
 
     def validate_day_of_week(self, value):
+        """Ensure `day_of_week` is within Python's 0 (Monday) to 6 (Sunday) range."""
         if value is not None and not (0 <= value <= 6):
             raise serializers.ValidationError('روز هفته باید عددی بین ۰ (دوشنبه) تا ۶ (یکشنبه) باشد.')
         return value
