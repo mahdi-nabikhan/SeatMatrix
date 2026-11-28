@@ -6,7 +6,12 @@ from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 from cinemas.api.v1.serializers import *
 from .permissions import *
-
+from cinemas.cache import (
+    get_cached_movie_detail,
+    get_cached_movie_list,
+    set_cached_movie_detail,
+    set_cached_movie_list,
+)
 
 class CinemaRegisterApiView(generics.CreateAPIView):
     serializer_class = CinemaRegisterSerializer
@@ -92,7 +97,21 @@ class MovieListApiView(generics.ListAPIView):
     serializer_class = MovieListSerializer
     queryset = Movie.objects.filter(is_active=True).select_related('created_by_cinema')
     permission_classes = [permissions.AllowAny]
-    
+    def list(self, request, *args, **kwargs):
+        host = request.get_host()
+        full_path = request.get_full_path()
+
+        cached_data = get_cached_movie_list(host=host, full_path=full_path)
+        if cached_data is not None:
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Cache'] = 'HIT'
+            return response
+
+        response = super().list(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            set_cached_movie_list(host=host, full_path=full_path, data=response.data)
+        response['X-Cache'] = 'MISS'
+        return response    
 
 
 class MovieDetailApiview(generics.RetrieveAPIView):
@@ -100,6 +119,21 @@ class MovieDetailApiview(generics.RetrieveAPIView):
     queryset = Movie.objects.select_related('created_by_cinema').prefetch_related('gallery_images')
     permission_classes = [permissions.AllowAny]
     
+    def retrieve(self, request, *args, **kwargs):
+        movie_id = int(kwargs['pk'])
+        host = request.get_host()
+
+        cached_data = get_cached_movie_detail(movie_id=movie_id, host=host)
+        if cached_data is not None:
+            response = Response(cached_data, status=status.HTTP_200_OK)
+            response['X-Cache'] = 'HIT'
+            return response
+
+        response = super().retrieve(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK:
+            set_cached_movie_detail(movie_id=movie_id, host=host, data=response.data)
+        response['X-Cache'] = 'MISS'
+        return response
     
     
     
