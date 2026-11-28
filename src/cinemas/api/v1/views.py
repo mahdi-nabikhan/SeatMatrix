@@ -15,6 +15,7 @@ from cinemas.cache import (
     set_cached_movie_detail,
     set_cached_movie_list,
 )
+from cinemas.ai_service import ask_movie_assistant
 
 class CinemaRegisterApiView(generics.CreateAPIView):
     serializer_class = CinemaRegisterSerializer
@@ -229,3 +230,36 @@ class RecommendedMovieListApiView(APIView):
         )
         response['X-Cache'] = 'HIT' if rec['cache_hit'] else 'MISS'
         return response
+    
+    
+    
+    
+class AIMovieAssistantApiView(APIView):
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AIMovieAssistantRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        result = ask_movie_assistant(
+            prompt=serializer.validated_data['prompt'],
+            schema_name=connection.schema_name,
+            limit=serializer.validated_data['limit'],
+        )
+
+        movies_data = MovieListSerializer(
+            result['movies'],
+            many=True,
+            context={'request': request},
+        ).data
+
+        return Response(
+            {
+                'provider': result['provider'],
+                'answer': result['answer'],
+                'count': len(movies_data),
+                'recommended_movies': movies_data,
+            },
+            status=status.HTTP_200_OK,
+        )

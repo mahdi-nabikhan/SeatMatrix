@@ -286,3 +286,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute='*/5'),
     },
 }
+
+
+
+
+AI_API_KEY = os.getenv('AI_API_KEY', 'aa-GWkBj9Vmp5mi4GUWnPIZVTriIADkBGfjQ3PH6AR0kSQWsM0X')
+AI_BASE_URL = os.getenv('AI_BASE_URL', 'https://api.avalai.ir/v1')
+AI_MODEL = os.getenv('AI_MODEL', 'deepseek-chat')
+AI_TIMEOUT_SECONDS = int(os.getenv('AI_TIMEOUT_SECONDS', '20'))

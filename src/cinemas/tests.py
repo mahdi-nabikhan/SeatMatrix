@@ -4,7 +4,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-
+from unittest.mock import MagicMock, patch
 from cinemas.cache import invalidate_movie_caches
 from cinemas.models import Cinema, CinemaDomain, Movie
 from datetime import timedelta
@@ -237,3 +237,69 @@ class MovieRecommendationTests(TransactionTestCase):
             res.data['results'][0]['recommendation_score'],
             res.data['results'][1]['recommendation_score'],
         )
+        
+        
+        
+from django.test import override_settings
+
+
+class AIMovieAssistantTests(TransactionTestCase):
+    def setUp(self):
+        connection.set_schema_to_public()
+
+        self.tenant = Cinema.objects.create(
+            schema_name='test_cinema_ai',
+            name='Test Cinema AI',
+        )
+        self.domain = CinemaDomain.objects.create(
+            domain='aitest.lvh.me',
+            tenant=self.tenant,
+            is_primary=True,
+        )
+
+        self.movie_comedy = Movie.objects.create(
+            title='The Grand Budapest Hotel',
+            description='Witty comedy adventure',
+            genre=Movie.GenreChoices.COMEDY,
+            duration_minutes=99,
+        )
+        self.movie_horror = Movie.objects.create(
+            title='The Conjuring',
+            description='Supernatural horror film',
+            genre=Movie.GenreChoices.HORROR,
+            duration_minutes=112,
+        )
+
+        self.client = APIClient(HTTP_HOST=self.domain.domain)
+
+    def tearDown(self):
+        connection.set_schema_to_public()
+        with connection.cursor() as cursor:
+            cursor.execute(f'DROP SCHEMA IF EXISTS "{self.tenant.schema_name}" CASCADE')
+
+    @override_settings(AI_API_KEY='test-key')
+    @patch('cinemas.ai_service._call_openai_compatible_api')
+    def test_ai_assistant_uses_llm_and_filters_invalid_ids(self, mock_llm):
+        mock_llm.return_value = {
+            'answer': 'برای حال‌وهوای شاد، فیلم The Grand Budapest Hotel عالیه.',
+            'recommended_movie_ids': [self.movie_comedy.id, 999999],
+        }
+
+        url = reverse('cinemas:movie-ai-assistant')
+        res = self.client.post(url, {'prompt': 'یه فیلم کمدی و شاد معرفی کن'}, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['provider'], 'llm')
+        self.assertEqual(res.data['count'], 1)
+        self.assertEqual(res.data['recommended_movies'][0]['id'], self.movie_comedy.id)
+        mock_llm.assert_called_once()
+
+    @override_settings(AI_API_KEY='')
+    def test_ai_assistant_falls_back_when_no_api_key(self):
+        url = reverse('cinemas:movie-ai-assistant')
+        res = self.client.post(url, {'prompt': 'یه فیلم ترسناک برای امشب می‌خوام', 'limit': 1}, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['provider'], 'fallback')
+        self.assertEqual(res.data['count'], 1)
+        self.assertEqual(res.data['recommended_movies'][0]['id'], self.movie_horror.id)

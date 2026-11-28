@@ -124,3 +124,6 @@ class MovieImageUpdateSerializer(serializers.ModelSerializer):
         
         
 
+class AIMovieAssistantRequestSerializer(serializers.Serializer):
+    prompt = serializers.CharField(min_length=3, max_length=500)
+    limit = serializers.IntegerField(min_value=1, max_value=10, required=False, default=3)
